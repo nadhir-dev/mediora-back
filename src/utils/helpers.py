@@ -1,0 +1,169 @@
+from typing import List
+from src.schemas.doctor_schedule import WorkingDays as WKSchema
+from src.schemas.doctor_schedule import RestTimes as RTSchema
+from src.schemas.doctor_schedule import SpecialSchedules as SSSchema
+from src.schemas.doctor_schedule import SpecialRestTimes as SRTSchema
+
+from src.utils.authentication import gen_id
+
+from uuid import UUID
+
+
+def format_doctor_schedule(s: WKSchema, user_id: UUID):
+
+    if isinstance(s.schedule, List):
+
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "day_of_week": v.day_of_week,
+                "max_appointments": v.max_appointments,
+                "starting_time": v.starting_time,
+                "finish_time": v.finish_time,
+            }
+            for v in s.schedule
+        ]
+
+    else:
+        # isinstance(s.schedule, WKSchema)
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "day_of_week": i,
+                "max_appointments": s.schedule.schedule.max_appointments,
+                "starting_time": s.schedule.schedule.starting_time,
+                "finish_time": s.schedule.schedule.finish_time,
+            }
+            for i in range(s.schedule.start, s.schedule.end + 1)
+        ]
+
+
+def format_doctor_rest_time(s: RTSchema, user_id: UUID):
+
+    if isinstance(s.schedule, List):
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "day_of_week": v.day_of_week,
+                "starting_time": v.starting_time,
+                "finish_time": v.finish_time,
+                "reason": v.reason if hasattr(v, "reason") else None,
+            }
+            for v in s.schedule
+        ]
+
+    else:
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "day_of_week": i,
+                "starting_time": s.schedule.rest.starting_time,
+                "finish_time": s.schedule.rest.finish_time,
+                "reason": (
+                    s.schedule.rest.reason
+                    if hasattr(s.schedule.rest, "reason")
+                    else None
+                ),
+            }
+            for i in range(s.schedule.start, s.schedule.end + 1)
+        ]
+
+
+def format_doctor_special_schedule(s: SSSchema, user_id: UUID):
+
+    if isinstance(s.schedule, List):
+
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "date": v.date,
+                "max_appointments": v.max_appointments,
+                "is_vacation": v.is_vacation,
+                "starting_time": v.starting_time,
+                "finish_time": v.finish_time,
+            }
+            for v in s.schedule
+        ]
+
+    else:
+        # isinstance(s.schedule, WKSchema)
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "date": s.schedule.schedule.date,
+                "is_vacation": s.schedule.schedule.is_vacation,
+                "max_appointments": s.schedule.schedule.max_appointments,
+                "starting_time": s.schedule.schedule.starting_time,
+                "finish_time": s.schedule.schedule.finish_time,
+            }
+            for i in range(s.schedule.start, s.schedule.end + 1)
+        ]
+
+
+def format_special_doctor_rest_time(s: SRTSchema, user_id: UUID):
+
+    if isinstance(s.schedule, List):
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "date": v.date,
+                "starting_time": v.starting_time,
+                "finish_time": v.finish_time,
+                "reason": v.reason if hasattr(v, "reason") else None,
+            }
+            for v in s.schedule
+        ]
+
+    else:
+        return [
+            {
+                "id": gen_id(),
+                "user_id": user_id,
+                "date": s.schedule.rest.date,
+                "starting_time": s.schedule.rest.starting_time,
+                "finish_time": s.schedule.rest.finish_time,
+                "reason": (
+                    s.schedule.rest.reason
+                    if hasattr(s.schedule.rest, "reason")
+                    else None
+                ),
+            }
+            for i in range(s.schedule.start, s.schedule.end + 1)
+        ]
+
+
+# def format_doctor_schedule(s: WKSchema, user_id: UUID):
+
+#     if isinstance(s.schedule, List):
+
+#         return [
+#             WorkingDays(
+#                 id=gen_id(),
+#                 user_id=user_id,
+#                 day_of_week=v.schedule.day_of_week,
+#                 starting_time=v.schedule.starting_time,
+#                 finish_time=v.schedule.finish_time,
+#             )
+#             for _, v in s
+#         ]
+
+#     else:
+#         # isinstance(s.schedule, WKSchema)
+#         return [
+#             WorkingDays(
+#                 id=gen_id(),
+#                 user_id=user_id,
+#                 day_of_week=i,
+#                 starting_time=s.schedule.starting_time,  # type:ignore
+#                 finish_time=s.schedule.finish_time,  # type:ignore
+#             )
+#             for i in range(s.schedule.start, s.schedule.end + 1)  # type:ignore
+#         ]
+#     pass
