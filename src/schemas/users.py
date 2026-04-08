@@ -144,7 +144,7 @@ class UserInsertion(BaseUser):
     phone: Optional[Phone] = Field(default=None, examples=["+1234567890"])
     gender: Optional[Gender] = Field(default=None, examples=["male", "female"])
     date_of_birth: Optional[date] = Field(default=None, examples=["1990-01-15"])
-    specialty: Speciality
+    specialty: Optional[Speciality]
     # device_id: str
 
     @model_validator(mode="after")

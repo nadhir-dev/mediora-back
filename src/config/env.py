@@ -52,6 +52,8 @@ class Env(BaseSettings):
     # chargily_fail_endpoint: str = Field(alias="CHARGILY_FAIL_URL")
     chargily_success_endpoint: str = Field(alias="CHARGILY_SUCCESS_ENDPOINT")
 
+    resend_api_key: str = Field(alias="RESEND_API_KEY")
+
     model_config = SettingsConfigDict(env_file=".env", env_prefix="", extra="forbid")
 
 

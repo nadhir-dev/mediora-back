@@ -1,13 +1,11 @@
+from starlette import status
+
 from src.config.env import env
 from src.config.env import production
 from src.schemas.users import Email
 
 from fastapi_mail import (
-    MessageSchema,
     ConnectionConfig,
-    MessageType,
-    FastMail,
-    MultipartSubtypeEnum,
 )
 
 
@@ -16,7 +14,7 @@ if production:
     conf = ConnectionConfig(
         MAIL_USERNAME=env.spacemail_username,
         MAIL_PASSWORD=env.spacemail_password,  # type: ignore
-        MAIL_FROM=env.mail_sender,
+        MAIL_FROM="Your App <noreply@nadhirdev.com>",
         MAIL_PORT=env.spacemail_port,
         MAIL_SERVER=env.spacemail_host,
         MAIL_FROM_NAME="Mediora",
@@ -39,40 +37,32 @@ else:
         VALIDATE_CERTS=True,
     )
 
+import httpx
+
 
 async def send_mail(
-    *, receiver: str, subject: str, msg_plain: str, msg_html: str | None = None
+    *,
+    receiver: str,
+    subject: str,
+    msg_plain: str,
+    msg_html: str | None = None,
 ):
+    url = "https://api.resend.com/emails"
 
-    message = MessageSchema(
-        subject=subject,
-        recipients=[receiver],  # type: ignore
-        template_body=msg_html,
-        subtype=MessageType.html,
-        alternative_body=msg_plain,
-        multipart_subtype=MultipartSubtypeEnum.alternative,
-    )
+    headers = {
+        "Authorization": f"Bearer {env.resend_api_key}",
+        "Content-Type": "application/json",
+    }
 
-    fm = FastMail(conf)
+    payload = {
+        "from": "Mediora <onboarding@nadhirdev.com>",
+        "to": [receiver],
+        "subject": subject,
+        "html": msg_html,
+    }
 
-    await fm.send_message(message=message)
-
-
-# async def send_mail_production(
-#     *, receiver: str, subject: str, msg_plain: str, msg_html: str
-# ):
-
-#     resend.api_key = env.resend_api_key
-
-#     await resend.Emails.send_async(
-#         {
-#             "from": "onboarding@resend.dev",
-#             "to": receiver,
-#             "subject": subject,
-#             "html": msg_html,
-#             "text": msg_plain,
-#         }
-#     )
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=payload, headers=headers)
 
 
 async def send_password_reset_token_email(email: str, token: str) -> None:
@@ -97,7 +87,6 @@ This code will expire in 15 minutes.
 If you did not request a password reset, you can safely ignore this account.
 """
 
-    # await send_mail_production(receiver=email, subject=subject, msg_plain=msg_plain, msg_html=msg_html)  # type: ignore
     await send_mail(receiver=email, subject=subject, msg_plain=msg_plain, msg_html=msg_html)  # type: ignore
 
 

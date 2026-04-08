@@ -24,11 +24,11 @@ class ImageFile(BaseModel):
 
 
 class RequestDocuments(BaseModel):
-    degree: ImageFile
-    employment_certificate: ImageFile
+    degree: PDF
+    employment_certificate: PDF
     images_of_workplace: List[ImageFile]
     commercial_registration_certificate: ImageFile
-    wallet_password: Password
+    wallet_password: Password = "SecurePass123!"
 
     model_config = ConfigDict(from_attributes=True)
 

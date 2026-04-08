@@ -1,3 +1,4 @@
+from random import randint
 from typing import Annotated, TYPE_CHECKING, Any
 from datetime import datetime, UTC
 from fastapi import Request
@@ -321,7 +322,7 @@ async def forgot_password(*, db: AsyncSession, tasks: "BackgroundTasks", email: 
     if not user.password:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "unallowed.")
 
-    token = gen_token()
+    token = str(randint(100000, 999999))
     tasks.add_task(send_password_reset_token_email, email, token)
 
     hashed_token = hash_token(token)
@@ -419,8 +420,8 @@ async def send_email_verification_otp(
         await db.execute(update_stmt)
 
     await db.commit()
-
     bg.add_task(send_email_verification_otp_code, email=email, code=code)
+    print("added task")
 
 
 async def verify_otp_code_and_email(*, db: AsyncSession, email: Email, code: str):
