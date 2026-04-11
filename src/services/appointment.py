@@ -1,5 +1,5 @@
-from datetime import UTC, date
-from datetime import datetime
+from datetime import date
+from datetime import date as d
 import hashlib
 import hmac
 import json
@@ -9,7 +9,7 @@ from fastapi import HTTPException, Request
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import or_, select, update
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from starlette import status
 
 from src.config.env import env
@@ -21,11 +21,12 @@ from src.models.Appointments import (
     Payments,
 )
 from src.models.messaging import ConversationMembers, Conversations
+from src.models.users import Users
 from src.schemas.appointment import AppointmentStatus, MakeAppointment
-from src.schemas.doctor_schedule import DoctorService, IsDoctorFree
+from src.schemas.doctor_schedule import IsDoctorFree
 from src.schemas.users import User
 from src.services.doctor_schedule import check_if_doctor_is_free
-from src.utils.authentication import gen_id, gen_token, get_token
+from src.utils.authentication import gen_id, gen_token
 from src.utils.time import after, now
 
 
@@ -36,22 +37,17 @@ async def create_appointment_session(
     appointment_info: MakeAppointment,
 ):
 
-    # supposing we can make further appointments today
-    stmt = select(AppointmentPaymentSession).where(
+    stmt = select(AppointmentPaymentSession.checkout_url).where(
         AppointmentPaymentSession.service_id == appointment_info.service_id,
         AppointmentPaymentSession.patient_id == user.id,
         AppointmentPaymentSession.is_expired == False,
         AppointmentPaymentSession.expires_at > now(),
     )
 
-    existing_session = (await db.scalars(stmt)).one_or_none()
+    existing_session_url = (await db.scalars(stmt)).one_or_none()
 
-    if existing_session:
-        # we shouldn't redirect it to this url as it may be expired
-        # in the case of the patient has already paid or other cases
-
-        existing_session.is_expired = True
-        await db.commit()
+    if existing_session_url:
+        return existing_session_url
 
     await check_if_doctor_is_free(
         db=db,
@@ -62,10 +58,13 @@ async def create_appointment_session(
 
     service = await db.get(DoctorServices, appointment_info.service_id)
 
-    # get service amount
+    if service.doctor_id == user.id:  # type:ignore
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "you cannot make an appointment with yourself."
+        )
+
     async with httpx.AsyncClient() as client:
 
-        # success_url = f"{env.protocol}://{env.url}/{env.chargily_success_endpoint}"
         success_url = f"{env.url}/appointments/chargily-webhook"
 
         response = await client.post(
@@ -80,17 +79,13 @@ async def create_appointment_session(
                 "success_url": success_url,
             },
         )
-        # try:
-        #     response.raise_for_status()
-        # except Exception:
-        #     raise HTTPException(
-        #         status.HTTP_500_INTERNAL_SERVER_ERROR, "something went wrong."
-        #     )
+
         data = response.json()
 
     session = AppointmentPaymentSession(
         service_id=appointment_info.service_id,
         patient_id=user.id,
+        date=appointment_info.date,
         expires_at=after(minutes=30),
         checkout_url=data["checkout_url"],  # type:ignore
     )
@@ -105,7 +100,7 @@ async def handle_chargilypay_webhook(
     db: AsyncSession,
     request: Request,
 ):
-    pass
+
     signature = request.headers.get("signature")
 
     if not signature:
@@ -125,56 +120,17 @@ async def handle_chargilypay_webhook(
     try:
         event = json.loads(body)
     except json.JSONDecodeError:
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON"
         )
 
-    # Handle events
     event_type = event.get("type")
     data = event.get("data")
 
-    # if event_type == "checkout.paid":
-
-    #     stmt = select(AppointmentPaymentSession).where(
-    #         AppointmentPaymentSession.checkout_url == data["url"]
-    #     ).options(selectinload(AppointmentPaymentSession.patient))
-    #     session = (await db.scalars(stmt)).one()
-    # # id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    # # service_id: Mapped[UUID] = mapped_column(
-    # #     ForeignKey("doctor_services.id", ondelete="cascade")
-    # # )
-    # # doctor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="cascade"))
-    # # patient_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="cascade"))
-    # # date: Mapped["date"] = mapped_column()
-    # # token: Mapped[str] = mapped_column()
-    # # status: Mapped[str] = mapped_column(default=AppointmentStatus.scheduled.value)
-    # # created_at: Mapped[datetime] = mapped_column(TIMESTAMP(True), default=now)
-
-    #     appointment = Appointments(service_id="",doctor_id)
-
-    #     session.is_expired = True
-
-    #     await db.commit()
-
-    # elif event_type == "checkout.failed":
-
-    #     stmt = (
-    #         update(AppointmentPaymentSession)
-    #         .where(AppointmentPaymentSession.checkout_url == data.url)
-    #         .values(expired=True)
-    #     )
-    #     await db.execute(stmt)
-    #     await db.commit()
-
-    #     raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR)
-
     if event_type == "checkout.paid":
-
-        stmt = (
-            select(AppointmentPaymentSession).where(
-                AppointmentPaymentSession.checkout_url == data["url"]
-            )
-            # .options(selectinload(AppointmentPaymentSession.patient))
+        stmt = select(AppointmentPaymentSession).where(
+            AppointmentPaymentSession.checkout_url == data["checkout_url"]
         )
 
         session = (await db.scalars(stmt)).one()
@@ -196,15 +152,18 @@ async def handle_chargilypay_webhook(
             date=session.date,
             token=gen_token(),
         )
-        # db.add(appointment)
 
         payment = Payments(
+            id=gen_id(),
             reciever_id=appointment.doctor_id,
             sender_id=appointment.patient_id,
             ammount=data.get("amount", 0),
             payment_session=session.id,
         )
-        # db.add(payment)
+
+        appointment_payment = AppointmentPayments(
+            payment_id=payment.id, type="service payment"
+        )
 
         session.is_expired = True
         conversation = Conversations(id=gen_id(), name="for later", is_group=False)
@@ -217,7 +176,14 @@ async def handle_chargilypay_webhook(
         )
 
         db.add_all(
-            [appointment, payment, conversation, user_membership, doctor_membership]
+            [
+                appointment,
+                payment,
+                appointment_payment,
+                conversation,
+                user_membership,
+                doctor_membership,
+            ]
         )
         await db.commit()
 
@@ -231,33 +197,38 @@ async def handle_chargilypay_webhook(
         await db.execute(stmt)
         await db.commit()
 
-    # Respond OK
-
-
-# async def expire_appointment_session(
-#     db: AsyncSession,
-#     user: User,
-#     data: MakeAppointment,
-# ):
-#     session = AppointmentPaymentSession(
-#         service_id=data.doctor_id, patient_id=user.id, expires_at=after(minutes=30)
-#     )
-
-#     db.add(session)
-#     await db.commit()
-
 
 async def fetch_patient_appointments(
     db: AsyncSession,
     user: User,
     status: AppointmentStatus,
-    date: date,
+    date: date | None,
+    page: int,
+    limit: int,
 ):
+    condition = (Appointments.patient_id == user.id) & (Appointments.status == status)
 
-    stmt = select(Appointments).where(
-        Appointments.patient_id == user.id,
-        Appointments.status == status,
-        Appointments.date == date,
+    if date:
+        condition = condition & (Appointments.date == date)
+    else:
+        condition = condition & (Appointments.date >= d.today())
+
+    stmt = (
+        select(Appointments)
+        .where(condition)
+        .options(
+            selectinload(Appointments.patient).load_only(
+                Users.first_name,
+                Users.last_name,
+                Users.username,
+                Users.is_doctor,
+                Users.specialty,
+                Users.joined_at,
+            )
+        )
+        .order_by(Appointments.created_at)
+        .limit(limit)
+        .offset((page - 1) * limit)
     )
 
     return (await db.scalars(stmt)).all()
@@ -268,36 +239,74 @@ async def fetch_doctor_appointments(
     user: User,
     appointmentStatus: AppointmentStatus,
     date: date,
+    page: int,
+    limit: int,
 ):
     if not user.is_doctor:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "only allowed doctors are allowed."
         )
 
-    stmt = select(Appointments).where(
-        Appointments.doctor_id == user.id,
-        Appointments.status == appointmentStatus,
-        Appointments.date == date,
-        #   Appointments.patient_id == user.id
+    stmt = (
+        select(Appointments)
+        .where(
+            Appointments.doctor_id == user.id,
+            Appointments.status == appointmentStatus,
+            Appointments.date == date,
+        )
+        .options(
+            selectinload(Appointments.patient).load_only(
+                Users.first_name,
+                Users.last_name,
+                Users.is_doctor,
+                Users.username,
+                Users.specialty,
+                Users.joined_at,
+            )
+        )
+        .order_by(
+            Appointments.created_at,
+        )
+        .limit(limit)
+        .offset((page - 1) * limit)
     )
 
     return (await db.scalars(stmt)).all()
 
 
-async def fetch_appointment(db: AsyncSession, user: User, appointment_id: UUID):
-    # if user.is_doctor:
-    #     raise HTTPException(status.HTTP_403_FORBIDDEN, "not allowed.")
+async def fetch_appointment(*, db: AsyncSession, user: User, appointment_id: UUID):
 
-    stmt = select(Appointments).where(
-        Appointments.id == appointment_id,
-        or_(
-            Appointments.doctor_id == user.id,
-            Appointments.patient_id == user.id,
-        ),
-        #   Appointments.patient_id == user.id
+    stmt = (
+        select(Appointments)
+        .where(
+            Appointments.id == appointment_id,
+            or_(
+                Appointments.doctor_id == user.id,
+                Appointments.patient_id == user.id,
+            ),
+        )
+        .options(
+            joinedload(Appointments.patient).load_only(
+                Users.first_name,
+                Users.last_name,
+                Users.is_doctor,
+                Users.username,
+                Users.specialty,
+                Users.joined_at,
+            ),
+            joinedload(Appointments.doctor).load_only(
+                Users.first_name,
+                Users.last_name,
+                Users.is_doctor,
+                Users.username,
+                Users.specialty,
+                Users.joined_at,
+            ),
+        )
     )
 
     data = (await db.scalars(stmt)).one_or_none()
+
     if not data:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, "no appointment matching this id."
@@ -306,7 +315,7 @@ async def fetch_appointment(db: AsyncSession, user: User, appointment_id: UUID):
     return data
 
 
-async def settle_appointment(db: AsyncSession, user: User, appointment_id: UUID):
+async def settle_appointment(*, db: AsyncSession, user: User, appointment_id: UUID):
     stmt = select(Appointments).where(
         Appointments.id == appointment_id,
         Appointments.patient_id == user.id,
@@ -319,16 +328,18 @@ async def settle_appointment(db: AsyncSession, user: User, appointment_id: UUID)
             status.HTTP_404_NOT_FOUND, "no appointment matching this id."
         )
 
-    if not appointment.status == AppointmentStatus.scheduled.value:
-        raise HTTPException(400, f"this appointment is already {appointment.status}.")
+    if appointment.status != AppointmentStatus.scheduled.value:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"this appointment is already {appointment.status}.",
+        )
 
     appointment.status = AppointmentStatus.completed.value
 
     await db.commit()
-    return appointment
 
 
-async def cancel_appointment_out(db: AsyncSession, user: User, appointment_id: UUID):
+async def cancel_appointment_out(*, db: AsyncSession, user: User, appointment_id: UUID):
     stmt = select(Appointments).where(
         Appointments.id == appointment_id,
         Appointments.patient_id == user.id,
@@ -341,7 +352,7 @@ async def cancel_appointment_out(db: AsyncSession, user: User, appointment_id: U
             status.HTTP_404_NOT_FOUND, "no appointment matching this id."
         )
 
-    if not appointment.status == AppointmentStatus.scheduled.value:
+    if appointment.status != AppointmentStatus.scheduled.value:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             f"this appointment is already {appointment.status}.",
@@ -350,10 +361,21 @@ async def cancel_appointment_out(db: AsyncSession, user: User, appointment_id: U
     appointment.status = AppointmentStatus.cancelled.value
 
     await db.commit()
+
+
+async def check_appointment_token(*, db: AsyncSession, user: User, token: str):
+
+    stmt = select(Appointments).where(Appointments.token == token)
+
+    appointment = (await db.scalars(stmt)).one_or_none()
+
+    if not appointment:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "there is no appointments matching this token."
+        )
+
+    if appointment.doctor_id != user.id:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "this appointment is with another doctor."
+        )
     return appointment
-
-
-# TODO: handle web hook with ngrok
-# TODO: review the is_free endpoint
-# TODO: add schemas to appointments endpoints
-# TODO: update fetch doctor and patient appointments

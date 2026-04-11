@@ -8,6 +8,7 @@ from starlette import status
 from src.db.connection import async_session
 from src.models.messaging import ConversationMembers, Conversations, Messages
 from src.models.users import Users
+from src.schemas.chat import ChatUpdates
 from src.schemas.users import User
 
 
@@ -122,9 +123,7 @@ async def read_message(
             }
 
 
-async def get_recent_contacts(
-    db_session: AsyncSession, user: User, limit: int, page: int
-):
+async def get_recent_contacts(*, db: AsyncSession, user: User, limit: int, page: int):
 
     subquery = (
         select(Messages.conversation_id, func.max(Messages.created_at).label("latest"))
@@ -147,8 +146,8 @@ async def get_recent_contacts(
             ConversationMembers, ConversationMembers.conversation_id == Conversations.id
         )
         .join(Users, Users.id == ConversationMembers.user_id)
-        .join(subquery, subquery.c.conversation_id == Conversations.id)
-        .join(
+        .outerjoin(subquery, subquery.c.conversation_id == Conversations.id)
+        .outerjoin(
             Messages,
             (Messages.conversation_id == Conversations.id)
             & (Messages.created_at == subquery.c.latest),
@@ -167,7 +166,7 @@ async def get_recent_contacts(
         .offset((page - 1) * limit)
     )
 
-    data = (await db_session.execute(stmt)).all()
+    data = (await db.execute(stmt)).all()
     output = []
 
     for v in data:
@@ -203,7 +202,7 @@ async def get_recent_contacts(
 
 
 async def get_recent_messages(
-    db_session: AsyncSession, user: User, conversation_id: UUID, limit: int, page: int
+    *, db: AsyncSession, user: User, conversation_id: UUID, limit: int, page: int
 ):
     exists_stmt = select(
         exists(Conversations)
@@ -217,7 +216,7 @@ async def get_recent_messages(
         .label("conversations_includes_user"),
     )
 
-    data = (await db_session.execute(exists_stmt)).one()
+    data = (await db.execute(exists_stmt)).one()
 
     if not data.conversation_exists:
         raise HTTPException(
@@ -237,6 +236,63 @@ async def get_recent_messages(
         .offset((page - 1) * limit)
     )
 
-    data = (await db_session.scalars(stmt)).all()
+    data = (await db.scalars(stmt)).all()
 
     return data
+
+
+async def update_chat(
+    *, db: AsyncSession, user: User, conversation_id: UUID, updates: ChatUpdates
+):
+
+    subquery = select(
+        exists().where(
+            ConversationMembers.conversation_id == conversation_id,
+            ConversationMembers.user_id == user.id,
+        )
+    ).scalar_subquery()
+
+    stmt = select(Conversations, subquery.label("user_is_member")).where(
+        ConversationMembers.conversation_id == conversation_id,
+    )
+
+    data = (await db.execute(stmt)).one_or_none()
+
+    if data is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "there is no conversations matching this id."
+        )
+
+    conversation, user_is_member = data
+
+    if not user_is_member:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "you're not a member of this chat."
+        )
+    conversation.name = updates.name
+    await db.commit()
+    return conversation
+
+    # stmt = select(
+    #     exists().where(
+    #         ConversationMembers.conversation_id == conversation_id,
+    #         ConversationMembers.user_id == user.id,
+    #     )
+    # )
+
+    # user_is_member = await db.scalar(stmt)
+
+    # if not user_is_member:
+    #     raise HTTPException(
+    #         status.HTTP_403_FORBIDDEN, "you're not a member of this chat or it doesn't include you."
+    #     )
+    # updates_dict = updates.model_dump()
+    # stmt = (
+    #     update(Conversations)
+    #     .values(**updates_dict)
+    #     .where(Conversations.id == conversation_id)
+    #     .returning(Conversations)
+    # )
+
+    # conversation =(await db.scalars(stmt)).one()
+    # return conversation

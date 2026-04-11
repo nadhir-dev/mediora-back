@@ -58,6 +58,7 @@ async def saveRequest(*, db: AsyncSession, user: User, docs: RequestDocuments):
                         Media(
                             id=media_id,
                             public_id=value["public_id"],
+                            url=value["secure_url"],
                             resource_type=value["public_id"],
                             format=value["format"],
                         )
@@ -78,6 +79,7 @@ async def saveRequest(*, db: AsyncSession, user: User, docs: RequestDocuments):
                     Media(
                         id=media_id,
                         public_id=v["public_id"],
+                        url=v["secure_url"],
                         resource_type=v["resource_type"],
                         format=v["format"],
                     )

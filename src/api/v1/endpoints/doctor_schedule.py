@@ -27,9 +27,8 @@ from src.schemas.doctor_schedule import (
     WorkingDays,
     RestTime,
     SpecialSchedules,
-    SpecialRestTimes,
 )
-from src.schemas.users import SuccessMessage, User
+from src.schemas.users import Speciality, SuccessMessage, User
 from src.services.authentication import protect
 from src.services.doctor_schedule import (
     add_service,
@@ -41,6 +40,7 @@ from src.services.doctor_schedule import (
     fetch_leaves,
     fetch_special_schedules,
     fetch_timeoffs,
+    get_some_doctors,
     get_working_times,
     modify_rest_hours,
     modify_working_time,
@@ -48,11 +48,24 @@ from src.services.doctor_schedule import (
     schedule_timeoff,
     add_special_schedule,
     modify_special_rest_times,
-    # check_if_doctor_is_free,
 )
 
 
 schedule_router = APIRouter(prefix="/doctors")
+
+
+@schedule_router.get("/")
+async def fetch_doctors(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    speciality: Speciality | None = None,
+    limit: int = Query(10, ge=1),
+    page: int = Query(1, ge=1),
+):
+    doctors = await get_some_doctors(
+        db=session, limit=limit, page=page, specialty=speciality
+    )
+
+    return {"data": doctors}
 
 
 @schedule_router.post("/schedule", response_model=WorkingDaysResponse)
@@ -230,10 +243,7 @@ async def remove_timeoff(
     return {"message": "special schedule removed successfully."}
 
 
-@schedule_router.post(
-    "/services",
-    #   response_model=DoctorServiceResponse
-)
+@schedule_router.post("/services", response_model=DoctorServiceResponse)
 async def add_new_service(
     user: Annotated[User, Depends(protect)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -256,6 +266,3 @@ async def can_doctor_take_appointments(
     await check_if_doctor_is_free(db=session, info=info)
 
     return {"message": "doctor is free to accept appointments."}
-
-
-# TODO: check overlaped resttimes on a working day, timeoffs too

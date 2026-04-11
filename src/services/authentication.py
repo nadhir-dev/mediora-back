@@ -11,7 +11,13 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 from src.models.users import Users, Auth, Info, Sessions, PendingEmails
-from src.schemas.users import UserInsertion, SigninCredentials, Email
+from src.schemas.users import (
+    ResetPassword,
+    UserInsertion,
+    SigninCredentials,
+    Email,
+    Username,
+)
 from src.config.env import env
 from src.utils.authentication import (
     get_token,
@@ -238,7 +244,6 @@ async def signin_with_google(*, db: AsyncSession, token, device_id: str | None):
 
         session_stmt = insert(Sessions).values(
             device_id=device_id,
-            # auth_id=user.id,
             user_id=user.id,
             refresh_token=refresh_token,
             refresh_token_expires=after(days=60),
@@ -257,7 +262,85 @@ async def signin_with_google(*, db: AsyncSession, token, device_id: str | None):
     return refresh_token, gen_access_token(user.id), device_id
 
 
-async def reset_password(
+async def reset_password(*, db: AsyncSession, code: str):
+
+    # should be using tokens instead of otp code
+    stmt = select(Auth).where(
+        Auth.otp_code == code,
+        Auth.otp_code_purpose == "forgot password",
+        Auth.otp_code_expires > datetime.now(UTC),
+    )
+
+    user_auth = (await db.scalars(stmt)).one_or_none()
+
+    if not user_auth:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "invalid token or has expired."
+        )
+
+    reset_token = gen_token()
+    user_auth.reset_token = hash_token(reset_token)
+    user_auth.reset_token_purpose = "reset password"
+    user_auth.reset_token_expires = after(minutes=30)
+
+    await db.commit()
+
+    return reset_token
+
+
+async def update_password_with_token(
+    *, db: AsyncSession, data: ResetPassword, device_id: str | None
+):
+    hashed_token = hash_token(data.reset_token)
+
+    stmt = select(Auth).where(
+        Auth.reset_token == hashed_token,
+        Auth.reset_token_purpose == "reset password",
+        Auth.reset_token_expires > datetime.now(UTC),
+    )
+
+    user_auth = (await db.scalars(stmt)).one_or_none()
+
+    if not user_auth:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "invalid token or has expired."
+        )
+
+    refresh_token, access_token = gen_refresh_token(), gen_access_token(user_auth.id)
+
+    user_auth.password = ag2.hash(data.password)
+    user_auth.reset_token = user_auth.reset_token_expires = (
+        user_auth.reset_token_purpose
+    ) = None
+
+    if device_id:
+        update_stmt = (
+            update(Sessions)
+            .values(invoked_at=now())
+            .where(
+                Sessions.device_id == device_id,
+                Sessions.invoked_at == None,
+                Sessions.user_id == user_auth.id,
+            )
+        )
+        await db.execute(update_stmt)
+
+    insert_stmt = insert(Sessions).values(
+        refresh_token=refresh_token,
+        refresh_token_expires=after(days=60),
+        device_id=device_id if device_id else gen_id(),
+        # auth_id=user_auth.id,
+        user_id=user_auth.id,
+    )
+
+    await db.execute(insert_stmt)
+
+    await db.commit()
+
+    return refresh_token, access_token
+
+
+async def old_reset_password(
     *, db: AsyncSession, token: str, password: str, device_id: str | None
 ):
 
@@ -265,7 +348,7 @@ async def reset_password(
 
     stmt = select(Auth).where(
         Auth.reset_token == hashed_token,
-        Auth.reset_token_purpose == "reset password",
+        Auth.reset_token_purpose == "forgot password",
         Auth.reset_token_expires > datetime.now(UTC),
     )
 
@@ -298,7 +381,7 @@ async def reset_password(
     insert_stmt = insert(Sessions).values(
         refresh_token=refresh_token,
         refresh_token_expires=after(days=60),
-        device_id=device_id,
+        device_id=device_id if device_id else gen_id(),
         # auth_id=user_auth.id,
         user_id=user_auth.id,
     )
@@ -308,6 +391,60 @@ async def reset_password(
     await db.commit()
 
     return refresh_token, access_token
+
+    # hashed_token = hash_token(token)
+
+    # stmt = select(Auth).where(
+    #     Auth.reset_token == hashed_token,
+    #     Auth.reset_token_purpose == "forgot password",
+    #     Auth.reset_token_expires > datetime.now(UTC),
+    # )
+
+    # user_auth = (await db.scalars(stmt)).one_or_none()
+
+    # if not user_auth:
+    #     raise HTTPException(
+    #         status.HTTP_401_UNAUTHORIZED, "invalid token or has expired."
+    #     )
+
+    # refresh_token, access_token = gen_refresh_token(), gen_access_token(user_auth.id)
+
+    # user_auth.password = ag2.hash(password)
+    # user_auth.reset_token = user_auth.reset_token_expires = (
+    #     user_auth.reset_token_purpose
+    # ) = None
+
+    # if device_id:
+    #     update_stmt = (
+    #         update(Sessions)
+    #         .values(invoked_at=now())
+    #         .where(
+    #             Sessions.device_id == device_id,
+    #             Sessions.invoked_at == None,
+    #             Sessions.user_id == user_auth.id,
+    #         )
+    #     )
+    #     await db.execute(update_stmt)
+
+    # insert_stmt = insert(Sessions).values(
+    #     refresh_token=refresh_token,
+    #     refresh_token_expires=after(days=60),
+    #     device_id=device_id if device_id else gen_id(),
+    #     # auth_id=user_auth.id,
+    #     user_id=user_auth.id,
+    # )
+
+    # await db.execute(insert_stmt)
+
+    # await db.commit()
+
+    # return refresh_token, access_token
+
+
+async def check_username_existence(*, db: AsyncSession, username: Username):
+    stmt = select(exists().where(Users.username == username))
+    username_exists = await db.scalar(stmt)
+    return username_exists
 
 
 async def forgot_password(*, db: AsyncSession, tasks: "BackgroundTasks", email: str):
@@ -322,14 +459,13 @@ async def forgot_password(*, db: AsyncSession, tasks: "BackgroundTasks", email: 
     if not user.password:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "unallowed.")
 
-    token = str(randint(100000, 999999))
-    tasks.add_task(send_password_reset_token_email, email, token)
+    code = gen_random_code(10)
 
-    hashed_token = hash_token(token)
+    tasks.add_task(send_password_reset_token_email, email, code)
 
-    user.reset_token = hashed_token
-    user.reset_token_purpose = "reset password"
-    user.reset_token_expires = after(minutes=10)
+    user.otp_code = code
+    user.otp_code_purpose = "forgot password"
+    user.otp_code_expires = after(minutes=10)
 
     await db.commit()
 

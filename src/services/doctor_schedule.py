@@ -10,14 +10,13 @@ from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.orm import selectinload
 from starlette import status
 
-# from src.models.appointments import AppointmentPaymentSession, Appointments
 from src.config.env import env
 from src.models.Appointments import Appointments
 from src.models.Appointments import AppointmentPaymentSession, DoctorServices
 from src.models.doctor_schedule import WorkingDays
 from src.models.users import Users
 from src.schemas.appointment import AppointmentStatus
-from src.schemas.users import User
+from src.schemas.users import Speciality, User
 from src.schemas.doctor_schedule import (
     FetchSpecialSchedule,
     IsDoctorFree,
@@ -38,14 +37,28 @@ from src.models.doctor_schedule import (
     WorkingDays,
 )
 
-# from src.schemas.User import User
 from src.utils.helpers import (
-    format_doctor_rest_time,
     format_doctor_schedule,
     format_doctor_special_schedule,
-    format_special_doctor_rest_time,
 )
 from src.utils.time import now
+
+
+async def get_some_doctors(
+    *, db: AsyncSession, page: int, limit: int, specialty: Speciality | None
+):
+    condition = Users.is_doctor.is_(True)
+
+    if specialty:
+        condition = condition & (Users.specialty == specialty)
+
+    doctors_stmt = (
+        select(Users).where(condition).limit(limit).offset((page - 1) * limit)
+    )
+
+    doctors = (await db.scalars(doctors_stmt)).all()
+
+    return doctors
 
 
 async def modify_working_time(*, db: AsyncSession, user: User, schedule: WDSchedule):
@@ -77,33 +90,35 @@ async def modify_rest_hours(*, db: AsyncSession, user: User, rest_time: RTSchema
             status.HTTP_403_FORBIDDEN, "you're not authenticated as a doctor."
         )
 
-    # data = format_doctor_rest_time(rest_time, user.id)
     existence_stmt = select(
         exists().where(
             RestTimes.day_of_week == rest_time.day_of_week,
             RestTimes.user_id == user.id,
-            or_(
-                and_(
-                    RestTimes.starting_time < rest_time.starting_time,
-                    RestTimes.finish_time > rest_time.starting_time,
-                ),
-                and_(
-                    RestTimes.starting_time < rest_time.finish_time,
-                    RestTimes.finish_time > rest_time.finish_time,
-                ),
-                and_(
-                    RestTimes.starting_time == rest_time.starting_time,
-                    RestTimes.finish_time == rest_time.finish_time,
-                ),
-                and_(
-                    RestTimes.starting_time == rest_time.starting_time,
-                    RestTimes.finish_time < rest_time.finish_time,
-                ),
-                and_(
-                    RestTimes.starting_time > rest_time.starting_time,
-                    RestTimes.finish_time == rest_time.finish_time,
-                ),
-            ),
+            and_(
+                RestTimes.starting_time < rest_time.finish_time,
+                RestTimes.finish_time > rest_time.starting_time,
+            ),  # or_(
+            #     and_(
+            #         RestTimes.starting_time < rest_time.starting_time,
+            #         RestTimes.finish_time > rest_time.starting_time,
+            #     ),
+            #     and_(
+            #         RestTimes.starting_time < rest_time.finish_time,
+            #         RestTimes.finish_time > rest_time.finish_time,
+            #     ),
+            #     and_(
+            #         RestTimes.starting_time == rest_time.starting_time,
+            #         RestTimes.finish_time == rest_time.finish_time,
+            #     ),
+            #     and_(
+            #         RestTimes.starting_time == rest_time.starting_time,
+            #         RestTimes.finish_time < rest_time.finish_time,
+            #     ),
+            #     and_(
+            #         RestTimes.starting_time > rest_time.starting_time,
+            #         RestTimes.finish_time == rest_time.finish_time,
+            #     ),
+            # ),
         )
     )
     existence = await db.scalar(existence_stmt)
@@ -127,8 +142,7 @@ async def modify_rest_hours(*, db: AsyncSession, user: User, rest_time: RTSchema
         )
         .returning(RestTimes)
     )
-    # TODO: make sure rest times and special rest times are within range when the doctor works
-    # TODO: make sure rest times and special rest times don't overlap with existing ones
+
     try:
         output = (await db.scalars(stmt)).one()
         await db.commit()
@@ -163,28 +177,8 @@ async def schedule_leave(*, db: AsyncSession, user: User, leave_info: LSchema):
     existence_stmt = select(
         exists(Leaves).where(
             Leaves.user_id == user.id,
-            or_(
-                and_(
-                    Leaves.starting_date < leave_info.starting_date,
-                    Leaves.finish_date > leave_info.starting_date,
-                ),
-                and_(
-                    Leaves.starting_date < finish_date,
-                    Leaves.finish_date > finish_date,
-                ),
-                and_(
-                    Leaves.starting_date == leave_info.starting_date,
-                    Leaves.finish_date == finish_date,
-                ),
-                and_(
-                    Leaves.starting_date == leave_info.starting_date,
-                    Leaves.finish_date < finish_date,
-                ),
-                and_(
-                    Leaves.starting_date > leave_info.starting_date,
-                    Leaves.finish_date == finish_date,
-                ),
-            ),
+            Leaves.starting_date < finish_date,
+            Leaves.finish_date > leave_info.starting_date,
         )
     )
 
@@ -230,8 +224,6 @@ async def schedule_timeoff(*, db: AsyncSession, user: User, timeoff_info: TOSche
             WorkingDays.user_id == user.id,
             WorkingDays.day_of_week == day_of_week,
             WorkingDays.starting_time <= timeoff_info.starting_time,
-            # WorkingDays.finish_time>=leave_info.starting_time,
-            # WorkingDays.starting_time<=finish_time,
             WorkingDays.finish_time >= finish_time,
         )
         .label("works_today"),
@@ -251,20 +243,8 @@ async def schedule_timeoff(*, db: AsyncSession, user: User, timeoff_info: TOSche
         .where(
             TimeOffs.user_id == user.id,
             TimeOffs.date == today,
-            or_(
-                and_(
-                    TimeOffs.starting_time < timeoff_info.starting_time,
-                    TimeOffs.finish_time > timeoff_info.starting_time,
-                ),
-                and_(
-                    TimeOffs.starting_time < finish_time,
-                    TimeOffs.finish_time > finish_time,
-                ),
-                and_(
-                    TimeOffs.starting_time == timeoff_info.starting_time,
-                    TimeOffs.finish_time == finish_time,
-                ),
-            ),
+            TimeOffs.starting_time < finish_time,
+            TimeOffs.finish_time > timeoff_info.starting_time,
         )
         .label("other_timeoff_exists"),
     )
@@ -302,28 +282,8 @@ async def schedule_timeoff(*, db: AsyncSession, user: User, timeoff_info: TOSche
             .where(
                 SpecialRestTimes.user_id == user.id,
                 SpecialRestTimes.date == today,
-                or_(
-                    and_(
-                        SpecialRestTimes.starting_time < finish_time,
-                        SpecialRestTimes.finish_time > finish_time,
-                    ),
-                    and_(
-                        SpecialRestTimes.starting_time < timeoff_info.starting_time,
-                        SpecialRestTimes.finish_time > timeoff_info.starting_time,
-                    ),
-                    and_(
-                        SpecialRestTimes.starting_time == timeoff_info.starting_time,
-                        SpecialRestTimes.finish_time == finish_time,
-                    ),
-                    and_(
-                        SpecialRestTimes.starting_time == timeoff_info.starting_time,
-                        SpecialRestTimes.finish_time < timeoff_info.finish_time,
-                    ),
-                    and_(
-                        SpecialRestTimes.starting_time > timeoff_info.starting_time,
-                        SpecialRestTimes.finish_time == timeoff_info.finish_time,
-                    ),
-                ),
+                SpecialRestTimes.starting_time < finish_time,
+                SpecialRestTimes.finish_time > timeoff_info.starting_time,
             )
             .label("doctor_schedule_to_rest_within"),
         )
@@ -344,28 +304,8 @@ async def schedule_timeoff(*, db: AsyncSession, user: User, timeoff_info: TOSche
     existence_special_schedule_stmt = select(
         exists(TimeOffs).where(
             TimeOffs.user_id == user.id,
-            or_(
-                and_(
-                    TimeOffs.starting_time < finish_time,
-                    TimeOffs.finish_time > finish_time,
-                ),
-                and_(
-                    TimeOffs.starting_time < timeoff_info.starting_time,
-                    TimeOffs.finish_time > timeoff_info.starting_time,
-                ),
-                and_(
-                    TimeOffs.starting_time == timeoff_info.starting_time,
-                    TimeOffs.finish_time == finish_time,
-                ),
-                and_(
-                    TimeOffs.starting_time == timeoff_info.starting_time,
-                    TimeOffs.finish_time < finish_time,
-                ),
-                and_(
-                    TimeOffs.starting_time > timeoff_info.starting_time,
-                    TimeOffs.finish_time == finish_time,
-                ),
-            ),
+            TimeOffs.starting_time < finish_time,
+            TimeOffs.finish_time > timeoff_info.starting_time,
         )
     )
     existing_leaves = await db.scalar(existence_special_schedule_stmt)
@@ -430,28 +370,8 @@ async def modify_special_rest_times(
         exists().where(
             SpecialRestTimes.date == rest_time.date,
             SpecialRestTimes.user_id == user.id,
-            or_(
-                and_(
-                    SpecialRestTimes.starting_time < rest_time.starting_time,
-                    SpecialRestTimes.finish_time > rest_time.starting_time,
-                ),
-                and_(
-                    SpecialRestTimes.starting_time < rest_time.finish_time,
-                    SpecialRestTimes.finish_time > rest_time.finish_time,
-                ),
-                and_(
-                    SpecialRestTimes.starting_time == rest_time.starting_time,
-                    SpecialRestTimes.finish_time == rest_time.finish_time,
-                ),
-                and_(
-                    SpecialRestTimes.starting_time == rest_time.starting_time,
-                    SpecialRestTimes.finish_time < rest_time.finish_time,
-                ),
-                and_(
-                    SpecialRestTimes.starting_time > rest_time.starting_time,
-                    SpecialRestTimes.finish_time == rest_time.finish_time,
-                ),
-            ),
+            SpecialRestTimes.starting_time < SpecialRestTimes.finish_time,
+            SpecialRestTimes.finish_time > rest_time.starting_time,
         )
     )
     existence = await db.scalar(existence_stmt)
@@ -527,14 +447,10 @@ async def fetch_special_schedules(
             "this id matches no doctors.",
         )
 
-    # if not user.is_doctor:
-    #     raise HTTPException(status.HTTP_403_FORBIDDEN, "you're not a doctor.")
-
     stmt = None
     include_rest_time = (
         SpecialSchedules.date == info.date if info.date is not None else True
     )
-    # condition = (SpecialSchedules.user_id == user.id) & include_rest_time
     condition = (SpecialSchedules.user_id == doctor_id) & include_rest_time
 
     if info.include_rest_times:
@@ -546,8 +462,6 @@ async def fetch_special_schedules(
     else:
         stmt = select(SpecialSchedules).where(condition)
 
-    # stmt = select(Leaves).where()
-    #
     special_schedule = (await db.scalars(stmt)).all()
 
     return special_schedule
@@ -580,8 +494,6 @@ async def fetch_leaves(*, db: AsyncSession, doctor_id: UUID, include_passed_ones
 
 
 async def fetch_timeoffs(*, db: AsyncSession, doctor_id: UUID):
-    # if not user.is_doctor:
-    #     raise HTTPException(status.HTTP_403_FORBIDDEN, "you're not a doctor.")
     stmt = select(exists().where(WorkingDays.user_id == doctor_id))
 
     doctor_exists = await db.scalar(stmt)
@@ -600,12 +512,10 @@ async def fetch_timeoffs(*, db: AsyncSession, doctor_id: UUID):
 
     return leaves
 
-    # as of today
     pass
 
 
 async def delete_working_day(*, db: AsyncSession, user: User, id: UUID):
-    # with or without rest_times
     if not user.is_doctor:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "you're not a doctor.")
 
@@ -625,7 +535,6 @@ async def delete_working_day(*, db: AsyncSession, user: User, id: UUID):
 
 
 async def delete_special_schedule(*, db: AsyncSession, user: User, id: UUID):
-    # with or without rest_times
     if not user.is_doctor:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "you're not a doctor.")
 
@@ -644,12 +553,9 @@ async def delete_special_schedule(*, db: AsyncSession, user: User, id: UUID):
         )
     await db.commit()
 
-    pass
-
 
 async def delete_leave(*, db: AsyncSession, user: User, id: UUID):
-    # all or only comming ones
-    # with or without rest_times
+
     if not user.is_doctor:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "you're not a doctor.")
 
@@ -708,7 +614,6 @@ async def add_service(*, db: AsyncSession, user: User, service_info: DoctorServi
         )
 
         product_data = response.json()
-        # print(product_data)
         response = await client.post(
             url=env.chargily_price_endpoint,
             headers={
@@ -716,7 +621,6 @@ async def add_service(*, db: AsyncSession, user: User, service_info: DoctorServi
                 "Content-Type": "application/json",
             },
             json={
-                # "name": service_info.name,
                 "amount": service_info.price,
                 "currency": "dzd",
                 "product_id": product_data["id"],
@@ -724,7 +628,6 @@ async def add_service(*, db: AsyncSession, user: User, service_info: DoctorServi
         )
 
         price_data = response.json()
-        # print(price_data)
 
     service = DoctorServices(
         doctor_id=user.id,
@@ -808,45 +711,10 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
     ).scalar_subquery()
 
     stmt = select(special_schedule_subquery, leave_subquery)
-    # .where(
-    #     WorkingDays.user_id == doctor_id,
-    #     WorkingDays.day_of_week == day_of_week,
-    # )
-    # .label("doctor_works_on_that_day"),
-
-    # stmt = select(
-    #     # exists()
-    #     # .where(Users.id == doctor_id, Users.is_active == True, Users.is_doctor == True)
-    #     # .label("doctor_exists"),
-    #     exists()
-    #     .where(
-    #         WorkingDays.user_id == doctor_id,
-    #         WorkingDays.day_of_week == day_of_week,
-    #         WorkingDays.max_appointments
-    #         > appointments_count + in_process_count,  # type:ignore
-    #     )
-    #     .label("doctor_works_on_that_day"),
-    #     exists()
-    #     .where(
-    #         SpecialSchedules.date == info.date, SpecialSchedules.user_id == doctor_id
-    #     )
-    #     .label("has_special_schedule"),
-    # )
 
     data = (await db.execute(stmt)).one()
 
-    # if not _.doctor_exists:
-    #     raise HTTPException(status.HTTP_404_NOT_FOUND, "no doctor matching that id.")
-
-    # if data is None:
-    #     raise HTTPException(
-    #         status.HTTP_404_NOT_FOUND,
-    #         "the doctor doesn't work on that day.",
-    #         # "the doctor doesn't work on that day or has reached the his max appointments per day, try later probably some patients will cancel out their appointment.",
-    #     )
     special_schedule_exists, on_leave = data
-
-    # if working_day_info
 
     if special_schedule_exists:
 
@@ -885,7 +753,6 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
                 "the doctor doesn't work on that day.",
-                # "the doctor doesn't work on that day or has reached the his max appointments per day, try later probably some patients will cancel out their appointment.",
             )
 
         if working_day_info.max_appointments <= appointments_count:  # type:ignore
@@ -901,80 +768,3 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
                 status.HTTP_404_NOT_FOUND,
                 "some appointment payments are in process, try later.",
             )
-    # typical_schedule_stmt = (
-    #     select(Users, appointments_count.label("appointments_count"))
-    #     .join(Users.working_days)
-    #     .where(
-    #         Users.id == info.doctor_id,
-    #         Users.is_doctor == True,
-    #         Users.is_active == True,
-    #         # WorkingDays.day_of_week == day_of_week,
-    #     )
-    #     .options(joinedload(Users.info))
-    # .distinct()
-    # .options(joinedload(Users.working_days))
-    # .options(joinedload(WorkingDays.rest_times))
-    # )
-
-    # schedule = await db_session.execute(typical_schedule_stmt)
-    # special_schedule = await db_session.scalars(special_schedule_stmt)
-
-    # schedule = schedule.one_or_none()
-    # special_schedule = special_schedule.one_or_none()
-
-    #     raise HTTPException(status.HTTP_404_NOT_FOUND, "the doctor has many appointments that day.")
-    # if (
-    #     special_schedule
-    #     and special_schedule.max_appointments <= schedule.appointments_count
-    # ):
-    #     raise HTTPException(status.HTTP_404_NOT_FOUND, "the doctor has many appointments that day.")
-
-    # stmtdt = select(WorkingDays).where(
-    #     WorkingDays.user_id == info.doctor_id,
-    #     WorkingDays.day_of_week == day_of_week,
-    # )
-    # stmtdtt = select(RestTimes).where(
-    #     RestTimes.user_id == info.doctor_id, RestTimes.day_of_week == day_of_week
-    # )
-
-    # stmtt = select(
-    #     exists(SpecialSchedule)
-    #     .where(
-    #         SpecialSchedule.user_id == info.doctor_id, SpecialSchedule.date == info.date
-    #     )
-    #     .scalar_subquery()
-    # )
-
-    # stmt = (
-    #     select(
-    #         # Users,
-    #         WorkingDays,
-    #         RestTimes,
-    #         SpecialSchedule,
-    #         SpecialRestTimes,
-    #     )
-    #     .join(WorkingDays, WorkingDays.user_id == Users.id)
-    #     .join(RestTimes, RestTimes.user_id == Users.id, isouter=True)
-    #     .join(SpecialSchedule, SpecialSchedule.user_id == Users.id, isouter=True)
-    #     .join(SpecialRestTimes, SpecialRestTimes.user_id == Users.id, isouter=True)
-    #     .where(
-    #         Users.id == info.doctor_id, Users.is_doctor == True, Users.is_active == True
-    #     )
-    # )
-    # stmt = select(
-    # exists()
-    # .where(Users.id == doctor_id, Users.is_doctor == True)
-    # .lable("doctor_exists"),
-    # select()
-    # )
-
-    # check if doctor can accept appointments
-    #     check doctor exists
-    #     doctor works on that day
-    #         typical and rest time
-    #         special schedule and special rest time
-    #         check the limit
-
-
-# TODO: add the functionality that the user can recieve his money back after cancel an appointment
-# TODO: add the functionality that the doctor can add a range where he can accpts appointments within

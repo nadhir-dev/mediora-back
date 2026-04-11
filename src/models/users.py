@@ -1,14 +1,14 @@
 from datetime import datetime, date
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
-from sqlalchemy import ForeignKey, DateTime, Date
+from sqlalchemy import ForeignKey, DateTime, Date, null
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db import BASE
 from src.utils.time import now
 
 
 if TYPE_CHECKING:
-    from src.models.doctor_authentication import DoctorRequest
+    from src.models.doctor_authentication import DoctorRequest, Media
 
 
 class Users(BASE):
@@ -20,12 +20,15 @@ class Users(BASE):
     last_name: Mapped[Optional[str]] = mapped_column(nullable=True)
     username: Mapped[str] = mapped_column(unique=True)
     email: Mapped[str] = mapped_column(unique=True)
-    is_doctor: Mapped[Optional[bool]] = mapped_column(default=False)
+    is_doctor: Mapped[bool] = mapped_column(default=False)
     role: Mapped[str] = mapped_column(default="user")  # user, doctor, admin
     specialty: Mapped[Optional[str]] = mapped_column(nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     is_active: Mapped[bool] = mapped_column(default=True)
     picture: Mapped[Optional[str]] = mapped_column(nullable=True)
+    picture_id: Mapped[Optional[UUID]] = mapped_column(
+        ForeignKey("profile_media.id", ondelete="SET NULL"), nullable=True
+    )
 
     auth: Mapped["Auth"] = relationship(
         back_populates="user",
@@ -76,17 +79,20 @@ class Info(BASE):
     __tablename__ = "info"
 
     gender: Mapped[Optional[str]] = mapped_column(nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(nullable=True)
+    clinic_posx: Mapped[Optional[str]] = mapped_column(nullable=True)
+    clinic_posy: Mapped[Optional[str]] = mapped_column(nullable=True)
     years_of_experience: Mapped[Optional[int]] = mapped_column(nullable=True)
     degree: Mapped[Optional[str]] = mapped_column(nullable=True)
     institution: Mapped[Optional[str]] = mapped_column(nullable=True)
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    phone: Mapped[Optional[str]] = mapped_column(nullable=True, unique=True)
-    # price_of_session: Mapped[Optional[str]] = mapped_column(nullable=True)
+    # phone number should be unique only if we verify it
+    # it is still not a concern now, cz we don't use it for sth critical
+    phone: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="cascade"), primary_key=True
     )
-    # user: Mapped["Users"] = relationship(back_populates="info")
 
 
 class Sessions(BASE):
@@ -133,3 +139,15 @@ class PendingEmails(BASE):
     )
 
     is_verified: Mapped[bool] = mapped_column(default=False)
+
+
+class ProfileMedia(BASE):
+    __tablename__ = "profile_media"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey("media.id", ondelete="cascade")
+    )
+    media: Mapped["Media"] = relationship(uselist=False)

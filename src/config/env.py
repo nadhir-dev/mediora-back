@@ -48,8 +48,6 @@ class Env(BaseSettings):
     chargily_product_endpoint: str = Field(alias="CHARGILY_PRODUCT_ENDPOINT")
     chargily_price_endpoint: str = Field(alias="CHARGILY_PRICE_ENDPOINT")
     chargily_checkout_endpoint: str = Field(alias="CHARGILY_CHECKOUT_ENDPOINT")
-    # chargily_success_endpoint: str = Field(alias="CHARGILY_SUCCESS_URL")
-    # chargily_fail_endpoint: str = Field(alias="CHARGILY_FAIL_URL")
     chargily_success_endpoint: str = Field(alias="CHARGILY_SUCCESS_ENDPOINT")
 
     resend_api_key: str = Field(alias="RESEND_API_KEY")

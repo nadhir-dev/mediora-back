@@ -47,6 +47,10 @@ class TypingMessageSchema(MessageSchema):
     payload: Payload
 
 
+class ChatUpdates(BaseModel):
+    name: str
+
+
 # SendMessage.model_validate(
 
 # )

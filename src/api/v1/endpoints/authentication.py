@@ -9,7 +9,8 @@ from src.config.env import env
 from src.config.http import limiter
 from src.db import get_db
 from src.schemas.users import (
-    RegistrationToken,
+    ExistsCheckResponse,
+    TokenWithMessage,
     ResetPassword,
     SuccessMessage,
     AccessToken,
@@ -18,16 +19,20 @@ from src.schemas.users import (
     Email,
     Password,
     SigninCredentials,
+    Username,
 )
 from src.services.authentication import (
     change_password,
+    check_username_existence,
     protect,
+    reset_password,
     signup,
     signin,
     forgot_password,
     logout_user,
-    reset_password,
+    old_reset_password,
     send_email_verification_otp,
+    update_password_with_token,
     verify_otp_code_and_email,
     signin_with_google,
     rotate_refresh_token,
@@ -55,7 +60,17 @@ async def verify_email(
     return {"message": "the otp code was scheduled, check your mailbox."}
 
 
-@auth_router.get("/verify-email", response_model=RegistrationToken)
+@auth_router.post("/check-username", response_model=ExistsCheckResponse)
+async def check_if_username_exists(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    username: Annotated[Username, Body(embed=True)],
+):
+    exists = await check_username_existence(db=session, username=username)
+
+    return {"exists": exists}
+
+
+@auth_router.get("/verify-email", response_model=TokenWithMessage)
 async def activate_email(
     session: Annotated[AsyncSession, Depends(get_db)],
     code: Annotated[str, Query()],
@@ -210,36 +225,69 @@ async def send_reset_password_token(
 
     await forgot_password(db=session, tasks=tasks, email=email)
 
-    return {"message": "token was sent, check your mailbox."}
+    return {"message": "otp code was sent, check your mailbox."}
 
 
-@auth_router.post("/reset-password")
+@auth_router.post("/reset-password", response_model=TokenWithMessage)
 @limiter.limit("5/minute")
 async def verify_reset_password_token(
     session: Annotated[AsyncSession, Depends(get_db)],
-    body: Annotated[ResetPassword, Body()],
-    response: Response,
+    code: Annotated[str, Body(embed=True)],
     request: Request,
 ):
-    device_id = get_device_id(request)
-    refresh_token, access_token = await reset_password(
-        db=session, token=body.reset_token, password=body.password, device_id=device_id
-    )
+    reset_token = await reset_password(db=session, code=code)
 
+    return {"message": "this token expires after 30 minutes.", "token": reset_token}
+    # @auth_router.post("/reset-password")
+    # @limiter.limit("5/minute")
+    # async def old_verify_reset_password_token(
+    #     session: Annotated[AsyncSession, Depends(get_db)],
+    #     body: Annotated[ResetPassword, Body()],
+    #     response: Response,
+    #     request: Request,
+    # ):
+    #     device_id = get_device_id(request)
+    #     refresh_token, access_token = await old_reset_password(
+    #         db=session, token=body.reset_token, password=body.password, device_id=device_id
+    #     )
+
+
+@auth_router.patch("/update-password-with-token", response_model=AccessToken)
+@limiter.limit("5/minute")
+async def change_password_with_token(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    body: Annotated[ResetPassword, Body()],
+    request: Request,
+    response: Response,
+):
+    device_id = get_device_id(request=request)
+    refresh_token, access_token = await update_password_with_token(
+        db=session, data=body, device_id=device_id
+    )
+    # @auth_router.post("/reset-password")
+    # @limiter.limit("5/minute")
+    # async def old_verify_reset_password_token(
+    #     session: Annotated[AsyncSession, Depends(get_db)],
+    #     body: Annotated[ResetPassword, Body()],
+    #     response: Response,
+    #     request: Request,
+    # ):
+    #     device_id = get_device_id(request)
+    #     refresh_token, access_token = await old_reset_password(
+    #         db=session, token=body.reset_token, password=body.password, device_id=device_id
+    #     )
+
+    response.set_cookie(
+        "access_token", access_token, expires=env.access_token_expiration, httponly=True
+    )
     response.set_cookie(
         "refresh_token",
         refresh_token,
-        expires=env.access_token_expiration,
-        httponly=True,
-    )
-    response.set_cookie(
-        "access_token",
-        access_token,
         expires=env.refresh_token_expiration,
         httponly=True,
     )
 
-    return {"message": "password was reset successfully."}
+    return {"token": access_token, "type": "Bearer"}
 
 
 @auth_router.post("/refresh", response_model=AccessToken)
@@ -267,7 +315,7 @@ async def refresh(
     return {"token": access_token, "type": "Bearer"}
 
 
-@auth_router.patch("/update-password", response_model=AccessToken)
+@auth_router.patch("/change-password", response_model=AccessToken)
 async def update_password(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(protect)],

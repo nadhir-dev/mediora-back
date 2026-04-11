@@ -1,5 +1,3 @@
-from starlette import status
-
 from src.config.env import env
 from src.config.env import production
 from src.schemas.users import Email

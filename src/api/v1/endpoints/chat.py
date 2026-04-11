@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, WebSocket
+from fastapi import APIRouter, Body, Depends, Query, WebSocket
 from pydantic import ValidationError
 from starlette import status
 from json import loads
@@ -10,6 +10,7 @@ from src.db.connection import get_db
 from src.schemas.chat import (
     ChatActions,
     ChatResponses,
+    ChatUpdates,
     ReadMessageSchema,
     SendMessageSchema,
     TypingMessageSchema,
@@ -22,6 +23,7 @@ from src.services.messaging import (
     get_recent_contacts,
     get_recent_messages,
     read_message,
+    update_chat,
 )
 from src.utils.chat_manager import ChatManager
 from src.utils.messaging import get_user_id
@@ -34,25 +36,38 @@ manager = ChatManager()
 
 @chat_router.get("/contacts/latest")
 async def get_contacts_with_latest_messages(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(protect)],
     limit: int = Query(10),
     page: int = Query(1),
 ):
-    output = await get_recent_contacts(db_session=db, user=user, limit=limit, page=page)
+    output = await get_recent_contacts(db=session, user=user, limit=limit, page=page)
     return output
 
 
 @chat_router.get("/conversations/:{id}/messages")
 async def get_messages(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(protect)],
     id: UUID,
     limit: int = Query(10),
     page: int = Query(1),
 ):
     output = await get_recent_messages(
-        db_session=db, user=user, conversation_id=id, limit=limit, page=page
+        db=session, user=user, conversation_id=id, limit=limit, page=page
+    )
+    return output
+
+
+@chat_router.patch("/conversations/:{id}/")
+async def modify_chat(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    id: UUID,
+    user: Annotated[User, Depends(protect)],
+    updates: Annotated[ChatUpdates, Body()],
+):
+    output = await update_chat(
+        db=session, user=user, conversation_id=id, updates=updates
     )
     return output
 

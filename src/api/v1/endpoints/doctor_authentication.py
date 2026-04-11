@@ -33,11 +33,11 @@ async def send_cerification_request(
 
 
 @doctor_approvement_router.get("/", response_model=DoctorRequests)
-async def get_doctors_request(
+async def get_doctors_requests(
     user: Annotated[User, Depends(protect)],
     session: Annotated[AsyncSession, Depends(get_db)],
-    limit: int = Query(default=10, lt=20, gt=0),
-    page: int = Query(default=1, gt=0),
+    limit: int = Query(10, lt=20, ge=1),
+    page: int = Query(1, ge=1),
 ):
     requests = await fetch_doctors_requests(
         db=session, user=user, limit=limit, page=page
@@ -55,7 +55,7 @@ async def get_my_request(
     return {"data": request}
 
 
-@doctor_approvement_router.get("/", response_model=DoctorRequest)
+@doctor_approvement_router.get("/{request_id}", response_model=DoctorRequest)
 async def get_doctor_request(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(protect)],

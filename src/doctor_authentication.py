@@ -3,7 +3,7 @@ from src.utils.time import now
 from datetime import datetime
 from uuid import UUID
 from src.db import BASE
-from sqlalchemy import TIMESTAMP, ForeignKey, UniqueConstraint, DateTime
+from sqlalchemy import ForeignKey, UniqueConstraint, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ class Media(BASE):
     public_id: Mapped[str] = mapped_column()
     resource_type: Mapped[str] = mapped_column()
     format: Mapped[str] = mapped_column()
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(True), default=now)
+    created_at: Mapped[datetime] = mapped_column(default=now)
 
     # request_media: Mapped["RequestMedia"] = relationship(back_populates="media")
     __table_args__ = (

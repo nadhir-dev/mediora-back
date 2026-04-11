@@ -42,10 +42,12 @@ hypothesis/
 .pytype/
 .pyre/
 
+
 alembic/
 alembic/__pycache__/
 alembic.ini.local
 alembic.ini.bak
+alembic.ini
 alembic/env.local.py
 
 todos.txt

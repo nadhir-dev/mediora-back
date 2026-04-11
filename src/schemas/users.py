@@ -16,6 +16,9 @@ from pydantic import (
 from starlette import status
 
 
+# from src.schemas.doctor_requests import ImageFile
+
+
 Email = Annotated[
     str,
     StringConstraints(
@@ -64,6 +67,32 @@ class ResetPassword(BaseModel):
         return v
 
 
+class UserFlatResponse(BaseModel):
+    id: UUID
+    first_name: str
+    last_name: Optional[str]
+    username: str
+    email: str
+    role: str
+    is_active: bool
+    is_doctor: bool
+    specialty: Optional[str]
+    joined_at: datetime
+    picture: Optional[str]
+
+    gender: Optional[str]
+    date_of_birth: Optional[date]
+    phone: Optional[str]
+    clinic_posx: Optional[str]
+    clinic_posy: Optional[str]
+    degree: Optional[str]
+    years_of_experience: Optional[int]
+    description: Optional[str]
+    institution: Optional[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class RegistrationRoles(str, Enum):
     user = "user"
     doctor = "doctor"
@@ -108,7 +137,7 @@ class UserPublic(BaseUser):
     id: UUID
     is_doctor: bool
     role: Roles
-    Specialily: Speciality
+    # Specialily: Speciality
     picture: Optional[str] = None
 
 
@@ -119,6 +148,14 @@ class User(UserPublic):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserResponse(BaseModel):
+    data: User
+
+
+class ExtendedUserResponse(BaseModel):
+    data: UserFlatResponse
+
+
 class UpdateUser(BaseModel):
     first_name: Optional[Name] = None
     last_name: Optional[Name] = None
@@ -126,6 +163,9 @@ class UpdateUser(BaseModel):
     phone: Optional[Phone] = None
     gender: Optional[Gender] = None
     date_of_birth: Optional[date] = None
+    description: Optional[str] = None
+    clinic_posx: Optional[str] = None
+    clinic_posy: Optional[str] = None
 
     @model_validator(mode="after")
     def check_not_empty(self) -> Self:
@@ -133,9 +173,18 @@ class UpdateUser(BaseModel):
         if all(field_value is None for field_value in self.model_dump().values()):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "nothing to update.")
 
+        if (self.clinic_posx and not self.clinic_posy) or (
+            not self.clinic_posx and self.clinic_posy
+        ):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "nothing to update.")
+
         return self
 
     model_config = ConfigDict(extra="ignore")
+
+
+class DoctorsResponse(BaseModel):
+    data: list[BaseUser]
 
 
 class UserInsertion(BaseUser):
@@ -144,7 +193,8 @@ class UserInsertion(BaseUser):
     phone: Optional[Phone] = Field(default=None, examples=["+1234567890"])
     gender: Optional[Gender] = Field(default=None, examples=["male", "female"])
     date_of_birth: Optional[date] = Field(default=None, examples=["1990-01-15"])
-    specialty: Optional[Speciality]
+    specialty: Optional[Speciality] = None
+
     # device_id: str
 
     @model_validator(mode="after")
@@ -211,7 +261,11 @@ class SuccessMessage(BaseModel):
     message: str
 
 
-class RegistrationToken(BaseModel):
+class ExistsCheckResponse(BaseModel):
+    exists: bool
+
+
+class TokenWithMessage(BaseModel):
     message: str
     token: str = Field(examples=["34vrgwrVOaDJZhM4jbfk9g"])
 

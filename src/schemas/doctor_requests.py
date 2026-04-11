@@ -11,6 +11,7 @@ class PDF(BaseModel):
     public_id: str
     format: Literal["pdf"]
     resource_type: Literal["raw"]
+    secure_url: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -19,6 +20,7 @@ class ImageFile(BaseModel):
     public_id: str
     format: Literal["jpg", "jpeg", "png", "webp"]
     resource_type: Literal["image"]
+    secure_url: str
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -59,7 +61,7 @@ class DoctorRequests(BaseModel):
 
 class Media(BaseModel):
     id: UUID
-    # url: str
+    url: str
     public_id: str
     resource_type: str
     format: str

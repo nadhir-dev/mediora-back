@@ -28,10 +28,7 @@ async def init_db():
     #
 
     async with engine.begin() as conn:
-        print("$" * 50)
-        # await conn.run_sync(BASE.metadata.drop_all)
         pass
-        # await conn.run_sync(BASE.metadata.create_all)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, Any]:

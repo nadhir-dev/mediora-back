@@ -1,8 +1,9 @@
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from enum import Enum
+from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class AppointmentStatus(str, Enum):
@@ -29,6 +30,86 @@ class MakeAppointment(BaseModel):
             raise ValueError("you cannot make appointments for today or earlier.")
 
         return v
+
+
+class UserResponseForAppointment(BaseModel):
+    first_name: str
+    last_name: str
+    username: str
+    is_doctor: bool
+    specialty: Optional[str]
+    joined_at: datetime
+
+
+class Appointment(BaseModel):
+    id: UUID
+    service_id: UUID
+    token: str
+    created_at: datetime
+    doctor_id: UUID
+    patient_id: UUID
+    date: date
+    status: AppointmentStatus
+
+
+class AppointmentWithUsersPopulated(Appointment):
+    doctor: UserResponseForAppointment
+    patient: UserResponseForAppointment
+
+
+class AppointmentResponse(BaseModel):
+    data: Appointment
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExtendedAppointmentResponse(BaseModel):
+    data: AppointmentWithUsersPopulated
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AppointmentWithDoctorPopulated(BaseModel):
+    id: UUID
+    service_id: UUID
+    token: str
+    created_at: datetime
+    doctor_id: UUID
+    patient_id: UUID
+    date: date
+    status: str
+
+    doctor: UserResponseForAppointment
+
+
+class AppointmentWithPatientPopulated(BaseModel):
+    id: UUID
+    service_id: UUID
+    token: str
+    created_at: datetime
+    doctor_id: UUID
+    patient_id: UUID
+    date: date
+    status: str
+
+    patient: UserResponseForAppointment
+
+
+class DoctorAppointmentsResponse(BaseModel):
+    data: list[AppointmentWithPatientPopulated]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PatientAppointmentsResponse(BaseModel):
+    data: list[AppointmentWithDoctorPopulated]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CheckoutUrl(BaseModel):
+    url: str
+
+
+class CheckoutUrlResponse(BaseModel):
+    data: CheckoutUrl
+    model_config = ConfigDict(from_attributes=True)
 
 
 # {

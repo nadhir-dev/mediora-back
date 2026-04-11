@@ -84,7 +84,8 @@ def gen_access_token(id) -> str:
     return jwt.encode(payload, env.jwt_secret, algorithm="HS256")
 
 
-def gen_random_code(length: int = 6) -> str:
+def gen_random_code(length: int = 7) -> str:
+    length -= 1
     num = randint(10**length, 10 ** (length + 1) - 1)
     return str(num)
 
