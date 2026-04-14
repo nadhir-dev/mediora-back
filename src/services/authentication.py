@@ -328,7 +328,7 @@ async def update_password_with_token(
     insert_stmt = insert(Sessions).values(
         refresh_token=refresh_token,
         refresh_token_expires=after(days=60),
-        device_id=device_id if device_id else gen_id(),
+        device_id=device_id if device_id else str(gen_id()),
         # auth_id=user_auth.id,
         user_id=user_auth.id,
     )
@@ -381,7 +381,7 @@ async def old_reset_password(
     insert_stmt = insert(Sessions).values(
         refresh_token=refresh_token,
         refresh_token_expires=after(days=60),
-        device_id=device_id if device_id else gen_id(),
+        device_id=device_id if device_id else str(gen_id()),
         # auth_id=user_auth.id,
         user_id=user_auth.id,
     )
@@ -391,54 +391,6 @@ async def old_reset_password(
     await db.commit()
 
     return refresh_token, access_token
-
-    # hashed_token = hash_token(token)
-
-    # stmt = select(Auth).where(
-    #     Auth.reset_token == hashed_token,
-    #     Auth.reset_token_purpose == "forgot password",
-    #     Auth.reset_token_expires > datetime.now(UTC),
-    # )
-
-    # user_auth = (await db.scalars(stmt)).one_or_none()
-
-    # if not user_auth:
-    #     raise HTTPException(
-    #         status.HTTP_401_UNAUTHORIZED, "invalid token or has expired."
-    #     )
-
-    # refresh_token, access_token = gen_refresh_token(), gen_access_token(user_auth.id)
-
-    # user_auth.password = ag2.hash(password)
-    # user_auth.reset_token = user_auth.reset_token_expires = (
-    #     user_auth.reset_token_purpose
-    # ) = None
-
-    # if device_id:
-    #     update_stmt = (
-    #         update(Sessions)
-    #         .values(invoked_at=now())
-    #         .where(
-    #             Sessions.device_id == device_id,
-    #             Sessions.invoked_at == None,
-    #             Sessions.user_id == user_auth.id,
-    #         )
-    #     )
-    #     await db.execute(update_stmt)
-
-    # insert_stmt = insert(Sessions).values(
-    #     refresh_token=refresh_token,
-    #     refresh_token_expires=after(days=60),
-    #     device_id=device_id if device_id else gen_id(),
-    #     # auth_id=user_auth.id,
-    #     user_id=user_auth.id,
-    # )
-
-    # await db.execute(insert_stmt)
-
-    # await db.commit()
-
-    # return refresh_token, access_token
 
 
 async def check_username_existence(*, db: AsyncSession, username: Username):
