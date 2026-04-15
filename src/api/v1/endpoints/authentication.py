@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.background import BackgroundTasks
 
-from src.config.env import env
+from src.config.env import env, production
 from src.config.http import limiter
 from src.db import get_db
 from src.schemas.users import (
@@ -83,8 +83,9 @@ async def activate_email(
     res.set_cookie(
         "creation_token",
         token,
-        samesite="lax",
+        samesite="none",
         httponly=True,
+        secure=production,
         expires=env.creation_token_expiration,
     )
 
@@ -112,15 +113,30 @@ async def register(
     )
 
     res.set_cookie(
-        "access_token", access_token, max_age=env.access_token_expiration, httponly=True
+        "access_token",
+        access_token,
+        secure=production,
+        max_age=env.access_token_expiration,
+        samesite="none",
+        httponly=True,
     )
     res.set_cookie(
         "refresh_token",
         refresh_token,
+        secure=production,
         max_age=env.refresh_token_expiration,
+        samesite="none",
         httponly=True,
     )
-    res.set_cookie("device_id", device_id, max_age=env.forever, httponly=True)
+
+    res.set_cookie(
+        "device_id",
+        device_id,
+        secure=production,
+        max_age=env.forever,
+        samesite="none",
+        httponly=True,
+    )
     res.headers["X-Device-Id"] = str(device_id)
     res.status_code = status.HTTP_201_CREATED
 
@@ -145,12 +161,19 @@ async def login(
     )
 
     res.set_cookie(
-        "access_token", access_token, max_age=env.access_token_expiration, httponly=True
+        "access_token",
+        access_token,
+        secure=production,
+        max_age=env.access_token_expiration,
+        samesite="none",
+        httponly=True,
     )
     res.set_cookie(
         "refresh_token",
         refresh_token,
+        secure=production,
         max_age=env.refresh_token_expiration,
+        samesite="none",
         httponly=True,
     )
 
@@ -199,15 +222,29 @@ async def auth_google(
     )
 
     res.set_cookie(
-        "access_token", access_token, max_age=env.access_token_expiration, httponly=True
+        "access_token",
+        access_token,
+        secure=production,
+        max_age=env.access_token_expiration,
+        samesite="none",
+        httponly=True,
     )
     res.set_cookie(
         "refresh_token",
         refresh_token,
+        secure=production,
         max_age=env.refresh_token_expiration,
+        samesite="none",
         httponly=True,
     )
-    res.set_cookie("device_id", device_id, max_age=env.forever, httponly=True)
+    res.set_cookie(
+        "device_id",
+        device_id,
+        secure=production,
+        max_age=env.forever,
+        samesite="none",
+        httponly=True,
+    )
     res.headers["X-Device-Id"] = str(device_id)
     res.status_code = status.HTTP_201_CREATED
 
@@ -278,12 +315,19 @@ async def change_password_with_token(
     #     )
 
     response.set_cookie(
-        "access_token", access_token, expires=env.access_token_expiration, httponly=True
+        "access_token",
+        access_token,
+        expires=env.access_token_expiration,
+        samesite="none",
+        httponly=True,
+        secure=production,
     )
     response.set_cookie(
         "refresh_token",
         refresh_token,
+        secure=production,
         expires=env.refresh_token_expiration,
+        samesite="none",
         httponly=True,
     )
 
@@ -303,13 +347,20 @@ async def refresh(
         db=session, refresh_token=old_refresh_token, device_id=device_id  # type:ignore
     )
     response.set_cookie(
-        "access_token", access_token, expires=env.access_token_expiration, httponly=True
+        "access_token",
+        access_token,
+        expires=env.access_token_expiration,
+        samesite="none",
+        httponly=True,
+        secure=production,
     )
     response.set_cookie(
         "refresh_token",
         refresh_token,
         expires=env.refresh_token_expiration,
+        samesite="none",
         httponly=True,
+        secure=production,
     )
 
     return {"token": access_token, "type": "Bearer"}
@@ -330,12 +381,19 @@ async def update_password(
     )
 
     response.set_cookie(
-        "access_token", access_token, expires=env.access_token_expiration, httponly=True
+        "access_token",
+        access_token,
+        expires=env.access_token_expiration,
+        samesite="none",
+        httponly=True,
+        secure=production,
     )
     response.set_cookie(
         "refresh_token",
         refresh_token,
         expires=env.refresh_token_expiration,
+        samesite="none",
         httponly=True,
+        secure=production,
     )
     return {"token": access_token, "type": "Bearer"}
