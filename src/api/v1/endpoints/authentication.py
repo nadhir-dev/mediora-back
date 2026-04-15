@@ -177,6 +177,16 @@ async def login(
         httponly=True,
     )
 
+    res.set_cookie(
+        "device_id",
+        str(device_id),
+        secure=production,
+        max_age=env.forever,
+        samesite="none",
+        httponly=True,
+    )
+    res.headers["X-Device-Id"] = str(device_id)
+
     return {"token": access_token, "type": "Bearer"}
 
 
