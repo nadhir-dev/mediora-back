@@ -9,7 +9,12 @@ from src.utils.time import after
 from fastapi import Request, HTTPException, status
 from jose import jwt
 from src.config.env import env
-from src.schemas.users import UserInfo, UserInsertion, InsertUserOauth
+from src.schemas.users import (
+    SigninCredentials,
+    UserInfo,
+    UserInsertion,
+    InsertUserOauth,
+)
 from src.utils.validators import is_id
 
 
@@ -96,6 +101,14 @@ def gen_token():
 
 def hash_token(token: str) -> str:
     return hmac.new(env.hash_secret.encode(), token.encode(), sha256).hexdigest()
+
+
+def get_credentials(identifier: str, password: str) -> SigninCredentials:
+    try:
+        v = SigninCredentials(identifier=identifier, password=password)
+    except Exception as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=e)
+    return v
 
 
 def get_device_id(

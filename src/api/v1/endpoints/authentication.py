@@ -1,3 +1,4 @@
+from curses import reset_prog_mode
 from typing import Annotated
 from fastapi import APIRouter, Response, Request, HTTPException, status
 from fastapi.params import Depends, Body, Query
@@ -39,6 +40,7 @@ from src.services.authentication import (
 )
 from src.config.google_client import oauth
 from src.utils.authentication import (
+    get_credentials,
     get_device_id,
     get_token,
     get_creation_token,
@@ -137,6 +139,9 @@ async def register(
         samesite="none",
         httponly=True,
     )
+
+    res.headers["access_token"] = access_token
+    res.headers["refresh_token"] = refresh_token
     res.headers["X-Device-Id"] = str(device_id)
     res.status_code = status.HTTP_201_CREATED
 
@@ -154,7 +159,7 @@ async def login(
 
     refresh_token, access_token = await signin(
         db=session,
-        credentials=SigninCredentials(
+        credentials=get_credentials(
             identifier=credentials.username, password=credentials.password
         ),
         device_id=device_id,  # type: ignore
@@ -185,6 +190,9 @@ async def login(
         samesite="none",
         httponly=True,
     )
+
+    res.headers["access_token"] = access_token
+    res.headers["refresh_token"] = refresh_token
     res.headers["X-Device-Id"] = str(device_id)
 
     return {"token": access_token, "type": "Bearer"}
@@ -256,6 +264,9 @@ async def auth_google(
         httponly=True,
     )
     res.headers["X-Device-Id"] = str(device_id)
+
+    res.headers["access_token"] = access_token
+    res.headers["refresh_token"] = refresh_token
     res.status_code = status.HTTP_201_CREATED
 
     return {"token": access_token, "type": "Bearer"}
@@ -285,18 +296,6 @@ async def verify_reset_password_token(
     reset_token = await reset_password(db=session, code=code)
 
     return {"message": "this token expires after 30 minutes.", "token": reset_token}
-    # @auth_router.post("/reset-password")
-    # @limiter.limit("5/minute")
-    # async def old_verify_reset_password_token(
-    #     session: Annotated[AsyncSession, Depends(get_db)],
-    #     body: Annotated[ResetPassword, Body()],
-    #     response: Response,
-    #     request: Request,
-    # ):
-    #     device_id = get_device_id(request)
-    #     refresh_token, access_token = await old_reset_password(
-    #         db=session, token=body.reset_token, password=body.password, device_id=device_id
-    #     )
 
 
 @auth_router.patch("/update-password-with-token", response_model=AccessToken)
@@ -311,18 +310,6 @@ async def change_password_with_token(
     refresh_token, access_token = await update_password_with_token(
         db=session, data=body, device_id=device_id
     )
-    # @auth_router.post("/reset-password")
-    # @limiter.limit("5/minute")
-    # async def old_verify_reset_password_token(
-    #     session: Annotated[AsyncSession, Depends(get_db)],
-    #     body: Annotated[ResetPassword, Body()],
-    #     response: Response,
-    #     request: Request,
-    # ):
-    #     device_id = get_device_id(request)
-    #     refresh_token, access_token = await old_reset_password(
-    #         db=session, token=body.reset_token, password=body.password, device_id=device_id
-    #     )
 
     response.set_cookie(
         "access_token",
@@ -340,6 +327,8 @@ async def change_password_with_token(
         samesite="none",
         httponly=True,
     )
+    response.headers["access_token"] = access_token
+    response.headers["refresh_token"] = refresh_token
 
     return {"token": access_token, "type": "Bearer"}
 
@@ -373,6 +362,8 @@ async def refresh(
         secure=production,
     )
 
+    response.headers["access_token"] = access_token
+    response.headers["refresh_token"] = refresh_token
     return {"token": access_token, "type": "Bearer"}
 
 
@@ -406,4 +397,7 @@ async def update_password(
         httponly=True,
         secure=production,
     )
+
+    response.headers["access_token"] = access_token
+    response.headers["refresh_token"] = refresh_token
     return {"token": access_token, "type": "Bearer"}
