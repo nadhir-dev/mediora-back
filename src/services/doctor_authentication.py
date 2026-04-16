@@ -114,10 +114,8 @@ async def saveRequest(*, db: AsyncSession, user: User, docs: RequestDocuments):
 
 async def fetch_my_request(*, db: AsyncSession, user: User):
 
-    if user.role != "doctor" or user.is_doctor:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "only unauthenticated doctors are allowed."
-        )
+    if user.role != "doctor":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "only doctors are allowed.")
 
     stmt = (
         select(DoctorRequest)

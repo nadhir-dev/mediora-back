@@ -57,7 +57,7 @@ class RequestMedia(BASE):
     document_type: Mapped[str] = mapped_column()
 
     request_id: Mapped[UUID] = mapped_column(
-        ForeignKey("doctor_requests.id"), nullable=False
+        ForeignKey("doctor_requests.id", ondelete="cascade"), nullable=False
     )
     document_id: Mapped[UUID] = mapped_column(
         ForeignKey("media.id", ondelete="cascade")
