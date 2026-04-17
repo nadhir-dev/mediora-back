@@ -22,7 +22,14 @@ async def update_user_data(*, db: AsyncSession, user: Users, updates: UpdateUser
 
     updates_dict = updates.model_dump(exclude_none=True)
     users_table_fields = {"first_name", "last_name", "username"}
-    info_table_fields = {"phone", "gender", "date_of_birth", "description"}
+    info_table_fields = {
+        "phone",
+        "gender",
+        "date_of_birth",
+        "description",
+        "clinic_posy",
+        "clinic_posx",
+    }
     doctor_fields = {"description", "clinic_posy", "clinic_posx"}
 
     # if not user.is_doctor and updates.description:
