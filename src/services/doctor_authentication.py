@@ -119,7 +119,7 @@ async def fetch_my_request(*, db: AsyncSession, user: User):
 
     stmt = (
         select(DoctorRequest)
-        .where(DoctorRequest.user_id == user.id, DoctorRequest.reviewed == False)
+        .where(DoctorRequest.user_id == user.id)
         .options(
             selectinload(DoctorRequest.request_media).selectinload(RequestMedia.media)
         )
