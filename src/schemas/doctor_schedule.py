@@ -483,3 +483,5 @@ class DoctorServiceExtended(BaseModel):
 
 class DoctorServiceResponse(BaseModel):
     data: DoctorServiceExtended
+class DoctorServicesResponse(BaseModel):
+    data: list[DoctorServiceExtended]

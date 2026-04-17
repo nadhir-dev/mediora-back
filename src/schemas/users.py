@@ -137,7 +137,7 @@ class UserPublic(BaseUser):
     id: UUID
     is_doctor: bool
     role: Roles
-    # Specialily: Speciality
+    specialty: Optional[Speciality] = None
     picture: Optional[str] = None
 
 
@@ -277,3 +277,6 @@ class AccessToken(BaseModel):
         ]
     )
     type: str = Field(examples=["Bearer"])
+
+class DoctorListResponse(BaseModel):
+    data: list[UserPublic]

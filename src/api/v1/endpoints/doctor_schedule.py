@@ -5,10 +5,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.connection import get_db
-from src.schemas.doctor_requests import DoctorRequest
 from src.schemas.doctor_schedule import (
     DoctorService,
     DoctorServiceResponse,
+    DoctorServicesResponse,
     FetchSpecialSchedule,
     IsDoctorFree,
     Leave,
@@ -28,7 +28,7 @@ from src.schemas.doctor_schedule import (
     RestTime,
     SpecialSchedules,
 )
-from src.schemas.users import Speciality, SuccessMessage, User
+from src.schemas.users import DoctorListResponse, Speciality, SuccessMessage, User
 from src.services.authentication import protect
 from src.services.doctor_schedule import (
     add_service,
@@ -40,6 +40,7 @@ from src.services.doctor_schedule import (
     fetch_leaves,
     fetch_special_schedules,
     fetch_timeoffs,
+    get_doctor_services,
     get_some_doctors,
     get_working_times,
     modify_rest_hours,
@@ -54,7 +55,7 @@ from src.services.doctor_schedule import (
 schedule_router = APIRouter(prefix="/doctors")
 
 
-@schedule_router.get("/")
+@schedule_router.get("/",response_model=DoctorListResponse)
 async def fetch_doctors(
     session: Annotated[AsyncSession, Depends(get_db)],
     speciality: Speciality | None = None,
@@ -253,6 +254,16 @@ async def add_new_service(
     output = await add_service(db=session, user=user, service_info=info)
 
     return {"data": output}
+
+@schedule_router.get("/{doctor_id}/services", response_model=DoctorServicesResponse)
+async def fetch_doctor_services(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    doctor_id: UUID,
+):
+
+    services = await get_doctor_services(db=session, doctor_id=doctor_id)
+
+    return {"data": services}
 
 
 @schedule_router.get("/is-free", response_model=SuccessMessage)

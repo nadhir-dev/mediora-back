@@ -85,7 +85,7 @@ async def activate_email(
     res.set_cookie(
         "creation_token",
         token,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
         secure=production,
         expires=env.creation_token_expiration,
@@ -113,13 +113,13 @@ async def register(
         device_id=device_id,  # type:ignore
         creation_token=creation_token,
     )
-
+    
     res.set_cookie(
         "access_token",
         access_token,
         secure=production,
         max_age=env.access_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
     res.set_cookie(
@@ -127,7 +127,7 @@ async def register(
         refresh_token,
         secure=production,
         max_age=env.refresh_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
 
@@ -136,7 +136,7 @@ async def register(
         device_id,
         secure=production,
         max_age=env.forever,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
 
@@ -156,7 +156,7 @@ async def login(
     res: Response,
 ):
     device_id = get_device_id(request, generate=True)
-
+    print("production", production)
     refresh_token, access_token = await signin(
         db=session,
         credentials=get_credentials(
@@ -170,7 +170,7 @@ async def login(
         access_token,
         secure=production,
         max_age=env.access_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
     res.set_cookie(
@@ -178,7 +178,7 @@ async def login(
         refresh_token,
         secure=production,
         max_age=env.refresh_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
 
@@ -187,7 +187,7 @@ async def login(
         str(device_id),
         secure=production,
         max_age=env.forever,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
 
@@ -244,7 +244,7 @@ async def auth_google(
         access_token,
         secure=production,
         max_age=env.access_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
     res.set_cookie(
@@ -252,7 +252,7 @@ async def auth_google(
         refresh_token,
         secure=production,
         max_age=env.refresh_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
     res.set_cookie(
@@ -260,7 +260,7 @@ async def auth_google(
         device_id,
         secure=production,
         max_age=env.forever,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
     res.headers["X-Device-Id"] = str(device_id)
@@ -315,7 +315,7 @@ async def change_password_with_token(
         "access_token",
         access_token,
         expires=env.access_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
         secure=production,
     )
@@ -324,7 +324,7 @@ async def change_password_with_token(
         refresh_token,
         secure=production,
         expires=env.refresh_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
     )
     response.headers["access_token"] = access_token
@@ -349,7 +349,7 @@ async def refresh(
         "access_token",
         access_token,
         expires=env.access_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
         secure=production,
     )
@@ -357,7 +357,7 @@ async def refresh(
         "refresh_token",
         refresh_token,
         expires=env.refresh_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
         secure=production,
     )
@@ -385,7 +385,7 @@ async def update_password(
         "access_token",
         access_token,
         expires=env.access_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
         secure=production,
     )
@@ -393,7 +393,7 @@ async def update_password(
         "refresh_token",
         refresh_token,
         expires=env.refresh_token_expiration,
-        samesite="none",
+        samesite="none" if production else "lax",
         httponly=True,
         secure=production,
     )

@@ -652,6 +652,26 @@ async def add_service(*, db: AsyncSession, user: User, service_info: DoctorServi
     return service
 
 
+
+async def get_doctor_services(*,db:AsyncSession,doctor_id:UUID):
+    pass
+    stmt = select(Users.is_doctor).where(Users.id == doctor_id,Users.is_active.is_(True))
+
+    is_doctor = await db.execute(stmt)
+    is_doctor = is_doctor.scalar_one_or_none()
+    
+    if is_doctor is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no users with this id.")
+    
+    if not is_doctor:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user is not a doctor.")
+
+    services_stmt = select(DoctorServices).where(DoctorServices.doctor_id==doctor_id)
+    services = (await db.scalars(services_stmt)).all()
+
+    return services
+    
+    # TODO: get doctor services
 async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
     day_of_week = info.date.weekday()
 
