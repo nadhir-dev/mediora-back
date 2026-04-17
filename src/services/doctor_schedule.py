@@ -671,24 +671,22 @@ async def get_doctor_services(*,db:AsyncSession,doctor_id:UUID):
 
     return services
     
-    # TODO: get doctor services
 async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
     day_of_week = info.date.weekday()
 
-    appointments_count_stmt = select(func.count()).where(
-        Appointments.service_id == info.service_id,
-        Appointments.date == info.date,
-        Appointments.status == AppointmentStatus.scheduled.value,
-    )
-    in_process_count_stmt = select(func.count()).where(
-        AppointmentPaymentSession.service_id == info.service_id,
-        AppointmentPaymentSession.created_at <= now(),
-        AppointmentPaymentSession.expires_at >= now(),
-        AppointmentPaymentSession.is_expired == False,
-    )
+  
+    # appointments_count_stmt = select(func.count()).where(
+    #     Appointments.service_id == info.service_id,
+    #     Appointments.date == info.date,
+    #     Appointments.status == AppointmentStatus.scheduled.value,
+    # )
+    # in_process_count_stmt = select(func.count()).where(
+    #     AppointmentPaymentSession.service_id == info.service_id,
+    #     AppointmentPaymentSession.created_at <= now(),
+    #     AppointmentPaymentSession.expires_at >= now(),
+    #     AppointmentPaymentSession.is_expired == False,
+    # )
 
-    appointments_count = await db.scalar(appointments_count_stmt)
-    in_process_count = await db.scalar(in_process_count_stmt)
 
     stmt = (
         select(Users.id, Users.is_active)
@@ -710,7 +708,24 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
             status.HTTP_404_NOT_FOUND, "no doctor services matching that id."
         )
 
+    appointments_count_stmt = select(func.count()).where(
+        Appointments.doctor_id == doctor_id,
+        Appointments.date == info.date,
+        Appointments.status == AppointmentStatus.scheduled.value,
+    )
+    in_process_count_stmt = select(func.count()).where(
+        AppointmentPaymentSession.service_id.in_(
+            select(DoctorServices.id).where(DoctorServices.doctor_id == doctor_id)
+        ),
+        AppointmentPaymentSession.created_at <= now(),
+        AppointmentPaymentSession.expires_at >= now(),
+        AppointmentPaymentSession.is_expired == False,
+    )
     #
+
+    appointments_count = await db.scalar(appointments_count_stmt)
+    in_process_count = await db.scalar(in_process_count_stmt)
+
     special_schedule_subquery = select(
         (
             exists().where(
@@ -762,7 +777,9 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
             )
 
     if on_leave:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "doctor is on a leave.")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "doctor is on a leave."
+        )
     else:
         stmt = select(WorkingDays).where(
             WorkingDays.user_id == doctor_id, WorkingDays.day_of_week == day_of_week
@@ -771,13 +788,13 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
 
         if working_day_info is None:
             raise HTTPException(
-                status.HTTP_404_NOT_FOUND,
+                status.HTTP_400_BAD_REQUEST,
                 "the doctor doesn't work on that day.",
             )
 
         if working_day_info.max_appointments <= appointments_count:  # type:ignore
             raise HTTPException(
-                status.HTTP_404_NOT_FOUND,
+                status.HTTP_400_BAD_REQUEST,
                 "the doctor has reached the maximum number of appointments on that day for this service.",
             )
         if (
@@ -785,6 +802,6 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
             <= appointments_count + in_process_count  # type:ignore
         ):
             raise HTTPException(
-                status.HTTP_404_NOT_FOUND,
+                status.HTTP_400_BAD_REQUEST,
                 "some appointment payments are in process, try later.",
             )
