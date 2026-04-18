@@ -288,6 +288,10 @@ class LeaveResponse(BaseModel):
     data: LeaveExtended
 
 
+class LeavesResponse(BaseModel):
+    data: list[LeaveExtended]
+
+
 class TimeOff(BaseModel):
     starting_time: time
     finish_time: Optional[time] = None

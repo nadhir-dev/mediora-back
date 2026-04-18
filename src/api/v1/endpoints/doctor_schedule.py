@@ -13,6 +13,7 @@ from src.schemas.doctor_schedule import (
     IsDoctorFree,
     Leave,
     LeaveResponse,
+    LeavesResponse,
     RestTime,
     RestTimeResponse,
     SpecialRestTime,
@@ -55,7 +56,7 @@ from src.services.doctor_schedule import (
 schedule_router = APIRouter(prefix="/doctors")
 
 
-@schedule_router.get("/",response_model=DoctorListResponse)
+@schedule_router.get("/", response_model=DoctorListResponse)
 async def fetch_doctors(
     session: Annotated[AsyncSession, Depends(get_db)],
     speciality: Speciality | None = None,
@@ -170,10 +171,7 @@ async def get_special_schedules(
     return {"data": special_schedules}
 
 
-@schedule_router.get(
-    "/leaves",
-    #   response_model=LeaveResponse
-)
+@schedule_router.get("/leaves", response_model=LeavesResponse)
 async def get_leaves(
     doctor_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -254,6 +252,7 @@ async def add_new_service(
     output = await add_service(db=session, user=user, service_info=info)
 
     return {"data": output}
+
 
 @schedule_router.get("/{doctor_id}/services", response_model=DoctorServicesResponse)
 async def fetch_doctor_services(

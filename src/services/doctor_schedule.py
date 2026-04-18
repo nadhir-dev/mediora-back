@@ -414,7 +414,11 @@ async def modify_special_rest_times(
 
 
 async def get_working_times(*, db: AsyncSession, doctor_id: UUID):
-    stmt = select(exists().where(WorkingDays.user_id == doctor_id))
+    stmt = select(
+        exists().where(
+            Users.id == doctor_id, Users.is_active.is_(True), Users.is_doctor.is_(True)
+        )
+    )
 
     doctor_exists = await db.scalar(stmt)
 
@@ -438,7 +442,11 @@ async def get_working_times(*, db: AsyncSession, doctor_id: UUID):
 async def fetch_special_schedules(
     *, db: AsyncSession, doctor_id: UUID, info: FetchSpecialSchedule
 ):
-    stmt = select(exists().where(WorkingDays.user_id == doctor_id))
+    stmt = select(
+        exists().where(
+            Users.id == doctor_id, Users.is_active.is_(True), Users.is_doctor.is_(True)
+        )
+    )
 
     doctor_exists = await db.scalar(stmt)
 
@@ -471,7 +479,11 @@ async def fetch_special_schedules(
 
 
 async def fetch_leaves(*, db: AsyncSession, doctor_id: UUID, include_passed_ones: bool):
-    stmt = select(exists().where(WorkingDays.user_id == doctor_id))
+    stmt = select(
+        exists().where(
+            Users.id == doctor_id, Users.is_active.is_(True), Users.is_doctor.is_(True)
+        )
+    )
 
     doctor_exists = await db.scalar(stmt)
 
@@ -485,7 +497,7 @@ async def fetch_leaves(*, db: AsyncSession, doctor_id: UUID, include_passed_ones
     if include_passed_ones:
         condition = Leaves.user_id == doctor_id
     else:
-        condition = (Leaves.user_id == doctor_id) & (Leaves.finish_date <= date.today())
+        condition = (Leaves.user_id == doctor_id) & (Leaves.finish_date >= date.today())
 
     stmt = select(Leaves).where(condition)
 
@@ -495,7 +507,11 @@ async def fetch_leaves(*, db: AsyncSession, doctor_id: UUID, include_passed_ones
 
 
 async def fetch_timeoffs(*, db: AsyncSession, doctor_id: UUID):
-    stmt = select(exists().where(WorkingDays.user_id == doctor_id))
+    stmt = select(
+        exists().where(
+            Users.id == doctor_id, Users.is_active.is_(True), Users.is_doctor.is_(True)
+        )
+    )
 
     doctor_exists = await db.scalar(stmt)
 
@@ -512,8 +528,6 @@ async def fetch_timeoffs(*, db: AsyncSession, doctor_id: UUID):
     leaves = (await db.scalars(stmt)).all()
 
     return leaves
-
-    pass
 
 
 async def delete_working_day(*, db: AsyncSession, user: User, id: UUID):
