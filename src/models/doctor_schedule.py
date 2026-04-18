@@ -28,9 +28,9 @@ class WorkingDays(BASE):
         ForeignKey("users.id", ondelete="cascade"), index=True
     )
     day_of_week: Mapped[int] = mapped_column(type_=SMALLINT)
-    starting_time: Mapped[time] = mapped_column(Time(timezone=True))
+    starting_time: Mapped[time] = mapped_column(Time(timezone=False))
     max_appointments: Mapped[int] = mapped_column()
-    finish_time: Mapped[time] = mapped_column(Time(timezone=True))
+    finish_time: Mapped[time] = mapped_column(Time(timezone=False))
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), default=now, onupdate=now
@@ -53,8 +53,8 @@ class RestTimes(BASE):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column()
-    starting_time: Mapped[time] = mapped_column(Time(timezone=True))
-    finish_time: Mapped[time] = mapped_column(Time(timezone=True))
+    starting_time: Mapped[time] = mapped_column(Time(timezone=False))
+    finish_time: Mapped[time] = mapped_column(Time(timezone=False))
     day_of_week: Mapped["date"] = mapped_column(type_=SMALLINT)
     reason: Mapped[Optional[str]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=now)
@@ -80,8 +80,8 @@ class SpecialSchedules(BASE):
     date: Mapped["date"] = mapped_column(index=True)
     max_appointments: Mapped[int] = mapped_column()
     is_vacation: Mapped[bool] = mapped_column(default=False)
-    starting_time: Mapped[time] = mapped_column(Time(timezone=True), nullable=True)
-    finish_time: Mapped[time] = mapped_column(Time(timezone=True), nullable=True)
+    starting_time: Mapped[time] = mapped_column(Time(timezone=False), nullable=True)
+    finish_time: Mapped[time] = mapped_column(Time(timezone=False), nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=now)
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
@@ -110,8 +110,8 @@ class SpecialRestTimes(BASE):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column()
-    starting_time: Mapped[time] = mapped_column(Time(timezone=True))
-    finish_time: Mapped[time] = mapped_column(Time(timezone=True))
+    starting_time: Mapped[time] = mapped_column(Time(timezone=False))
+    finish_time: Mapped[time] = mapped_column(Time(timezone=False))
     date: Mapped["date"] = mapped_column()
     reason: Mapped[Optional[str]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=now)
@@ -157,7 +157,7 @@ class TimeOffs(BASE):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     date: Mapped["date"] = mapped_column(index=True)
-    starting_time: Mapped[time] = mapped_column(Time(timezone=True))
-    finish_time: Mapped[time] = mapped_column(Time(timezone=True))
+    starting_time: Mapped[time] = mapped_column(Time(timezone=False))
+    finish_time: Mapped[time] = mapped_column(Time(timezone=False))
     reason: Mapped[Optional[str]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=now)

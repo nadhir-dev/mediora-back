@@ -1,6 +1,6 @@
 from datetime import time, date, timedelta, datetime
 from datetime import date as d
-from typing import List, Optional, Self
+from typing import List, Optional, Self, override
 from uuid import UUID
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -8,9 +8,7 @@ from starlette import status
 
 from src.config.env import env
 
-
-class WorkingDay(BaseModel):
-    day_of_week: int = Field(ge=0, le=6)
+class WorkingDayWithoutDayOfWeek(BaseModel):
     starting_time: time = Field()
     finish_time: time = Field()
     max_appointments: int = Field(gt=0, le=20)
@@ -38,6 +36,11 @@ class WorkingDay(BaseModel):
         #     )
 
         return self
+
+    model_config = ConfigDict(from_attributes=True)
+
+class WorkingDay(WorkingDayWithoutDayOfWeek):
+    day_of_week: int = Field(ge=0, le=6)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -74,7 +77,7 @@ class WorkingDaysRange(BaseModel):
 
     start: int = Field(ge=0, le=6)
     end: int = Field(ge=0, le=6)
-    schedule: WorkingDay
+    schedule: WorkingDayWithoutDayOfWeek
 
     @model_validator(mode="after")
     def validate_times(self) -> Self:
@@ -92,14 +95,12 @@ class WorkingDaysRange(BaseModel):
         return self
 
 
+
+
 class WorkingDays(BaseModel):
     schedule: WorkingDaysRange | List[WorkingDay]
 
-    @model_validator(mode="before")
-    def fix(cls, data):
-        if not isinstance(data.get("schedule"), list):
-            data.get("schedule")["day_of_week"] = 0
-        return data
+ 
 
 
 class RestTime(BaseModel):
