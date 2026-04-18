@@ -113,7 +113,7 @@ async def register(
         device_id=device_id,  # type:ignore
         creation_token=creation_token,
     )
-    
+
     res.set_cookie(
         "access_token",
         access_token,
@@ -156,7 +156,6 @@ async def login(
     res: Response,
 ):
     device_id = get_device_id(request, generate=True)
-    print("production", production)
     refresh_token, access_token = await signin(
         db=session,
         credentials=get_credentials(

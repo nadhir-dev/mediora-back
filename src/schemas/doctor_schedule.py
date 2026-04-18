@@ -1,12 +1,11 @@
 from datetime import time, date, timedelta, datetime
 from datetime import date as d
-from typing import List, Optional, Self, override
+from typing import List, Optional, Self
 from uuid import UUID
-from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from starlette import status
 
 from src.config.env import env
+
 
 class WorkingDayWithoutDayOfWeek(BaseModel):
     starting_time: time = Field()
@@ -16,8 +15,7 @@ class WorkingDayWithoutDayOfWeek(BaseModel):
     @model_validator(mode="after")
     def validate_times(self) -> Self:
         if self.starting_time >= self.finish_time:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "working time is contradictory, (starting time >= finish time)",
             )
 
@@ -25,19 +23,18 @@ class WorkingDayWithoutDayOfWeek(BaseModel):
         end = datetime.combine(date.today(), self.finish_time)
 
         if end - start < timedelta(hours=1):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "working time is too short, at least one hour.",
             )
         # if self.day_of_week > 6 or self.day_of_week < 0:
-        #     raise HTTPException(
-        #         status.HTTP_400_BAD_REQUEST,
+        #     raise ValueError(
         #         "working day is contradictory, (6 >= working day >= 0)",
         #     )
 
         return self
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class WorkingDay(WorkingDayWithoutDayOfWeek):
     day_of_week: int = Field(ge=0, le=6)
@@ -82,25 +79,19 @@ class WorkingDaysRange(BaseModel):
     @model_validator(mode="after")
     def validate_times(self) -> Self:
         if self.end < self.start:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "working time is contradictory, (start > end)",
             )
         # if self.start < 0 or self.end > 6:
-        #     raise HTTPException(
-        #        status.HTTP_400_BAD_REQUEST,
+        #     raise ValueError(
         #         "working day is contradictory, (6 >= working day >= 0)",
         #     )
 
         return self
 
 
-
-
 class WorkingDays(BaseModel):
     schedule: WorkingDaysRange | List[WorkingDay]
-
- 
 
 
 class RestTime(BaseModel):
@@ -112,8 +103,7 @@ class RestTime(BaseModel):
     @model_validator(mode="after")
     def validate_times(self) -> Self:
         if self.starting_time >= self.finish_time:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "working time is contradictory, (starting time >= finish time)",
             )
 
@@ -121,8 +111,7 @@ class RestTime(BaseModel):
         end = datetime.combine(date.today(), self.finish_time)
 
         if end - start < timedelta(minutes=5):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "rest is too short, at least five minutes long.",
             )
         return self
@@ -160,8 +149,7 @@ class RestTimeRange(BaseModel):
     @model_validator(mode="after")
     def validate_range(self) -> Self:
         if self.end < self.start:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "time is contradictory, (start > end)",
             )
         return self
@@ -188,8 +176,7 @@ class SpecialSchedule(BaseModel):
     @model_validator(mode="after")
     def validate_times(self) -> Self:
         if not self.is_vacation and (not self.finish_time or not self.starting_time):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "must provide either is_vacation or starting_time and finish_time.",
             )
 
@@ -199,18 +186,15 @@ class SpecialSchedule(BaseModel):
             end = datetime.combine(date.today(), self.finish_time)
 
             if end - start < timedelta(hours=1):
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
+                raise ValueError(
                     "working time is too short, at least one hour.",
                 )
         # if self.max_appointments and self.max_appointments <= 0:
-        #     raise HTTPException(
-        #         status.HTTP_400_BAD_REQUEST,
+        #     raise ValueError(
         #         "limit must be > 0",
         #     )
         if date.today() >= self.date:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "the date is contradictory (the date provided is already gone).",
             )
 
@@ -253,8 +237,7 @@ class SpecialScheduleRange(BaseModel):
     @model_validator(mode="after")
     def validate_range(self) -> Self:
         if self.end < self.start:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "working time is contradictory, (start > end)",
             )
         return self
@@ -273,13 +256,11 @@ class Leave(BaseModel):
     @model_validator(mode="after")
     def validate_times(self) -> Self:
         if not self.finish_date and not self.period_in_days:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "you have to provide either of these fields finish_date or period_in_days.",
             )
         if date.today() + timedelta(days=7) > self.starting_date:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "leaves have to be scheduled a at least a week ealier.",
             )
 
@@ -287,8 +268,7 @@ class Leave(BaseModel):
             self.finish_date is not None
             and self.starting_date + timedelta(days=1) > self.finish_date
         ):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "leaves have to be at least one day long.",
             )
 
@@ -317,8 +297,7 @@ class TimeOff(BaseModel):
     @model_validator(mode="after")
     def validate_times(self) -> Self:
         if not self.finish_time and not self.duration_in_minutes:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "you have to provide either of these fields finish_time or duration_in_minutes.",
             )
 
@@ -328,8 +307,7 @@ class TimeOff(BaseModel):
 
             if start >= end + timedelta(minutes=5):
 
-                raise HTTPException(
-                    status.HTTP_400_BAD_REQUEST,
+                raise ValueError(
                     "timeoff has to be 5 minutes long at least.",
                 )
         return self
@@ -362,8 +340,7 @@ class SpecialRestTime(BaseModel):
     @model_validator(mode="after")
     def validate_times(self) -> Self:
         if self.starting_time >= self.finish_time:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "time is contradictory, (starting time >= finish time)",
             )
 
@@ -371,8 +348,7 @@ class SpecialRestTime(BaseModel):
         end = datetime.combine(date.today(), self.finish_time)
 
         if end - start < timedelta(minutes=5):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "rest is too short, at least five minutes long.",
             )
         return self
@@ -398,8 +374,7 @@ class SpecialRestTimeRange(BaseModel):
     @model_validator(mode="after")
     def validate_range(self) -> Self:
         if self.end < self.start:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
+            raise ValueError(
                 "time is contradictory, (start > end)",
             )
         return self
@@ -484,5 +459,7 @@ class DoctorServiceExtended(BaseModel):
 
 class DoctorServiceResponse(BaseModel):
     data: DoctorServiceExtended
+
+
 class DoctorServicesResponse(BaseModel):
     data: list[DoctorServiceExtended]

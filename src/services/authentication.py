@@ -509,7 +509,6 @@ async def send_email_verification_otp(
 
     await db.commit()
     bg.add_task(send_email_verification_otp_code, email=email, code=code)
-    print("added task")
 
 
 async def verify_otp_code_and_email(*, db: AsyncSession, email: Email, code: str):
@@ -592,7 +591,10 @@ async def change_password(
     stmt = select(Auth).where(Auth.id == user.id)
     auth = (await db.scalars(stmt)).one()
 
-    if not ag2.verify(auth.password, current_password):  # type:ignore
+    try:
+        ag2.verify(auth.password, current_password)  # type:ignore
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
+
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials.")
 
     auth.password = ag2.hash(new_password)

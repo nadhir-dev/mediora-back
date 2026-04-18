@@ -11,7 +11,7 @@ from uuid import UUID
 
 def format_doctor_schedule(s: WKSchema, user_id: UUID):
 
-    if isinstance(s.schedule, List):
+    if isinstance(s.schedule, list):
 
         return [
             {

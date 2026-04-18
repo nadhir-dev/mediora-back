@@ -64,17 +64,12 @@ def get_token(
 
     if header_token.startswith("Bearer "):
         return header_token.split(" ")[1]
-    print("header_token", header_token)
 
     cookie_token = request.cookies.get(f"{token_type}_token", None)
-    print("headers", request.headers)
-    print("cookies", request.cookies)
-    print("cookie_token", cookie_token)
     if required and not cookie_token:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing {token_type} token."
         )
-
 
     return cookie_token
 
