@@ -224,6 +224,7 @@ async def fetch_patient_appointments(
                 Users.is_doctor,
                 Users.specialty,
                 Users.joined_at,
+                Users.picture,
             )
         )
         .order_by(Appointments.created_at)
@@ -262,6 +263,7 @@ async def fetch_doctor_appointments(
                 Users.username,
                 Users.specialty,
                 Users.joined_at,
+                Users.picture,
             )
         )
         .order_by(
@@ -293,6 +295,7 @@ async def fetch_appointment(*, db: AsyncSession, user: User, appointment_id: UUI
                 Users.username,
                 Users.specialty,
                 Users.joined_at,
+                Users.picture,
             ),
             joinedload(Appointments.doctor).load_only(
                 Users.first_name,
@@ -301,6 +304,7 @@ async def fetch_appointment(*, db: AsyncSession, user: User, appointment_id: UUI
                 Users.username,
                 Users.specialty,
                 Users.joined_at,
+                Users.picture,
             ),
         )
     )

@@ -37,8 +37,9 @@ class UserResponseForAppointment(BaseModel):
     last_name: str
     username: str
     is_doctor: bool
-    specialty: Optional[str]
+    specialty: Optional[str] = None
     joined_at: datetime
+    picture: Optional[str] = None
 
 
 class Appointment(BaseModel):
@@ -88,6 +89,7 @@ class AppointmentWithPatientPopulated(BaseModel):
     doctor_id: UUID
     patient_id: UUID
     date: date
+
     status: str
 
     patient: UserResponseForAppointment

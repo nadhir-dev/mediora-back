@@ -61,7 +61,7 @@ async def get_doctor_appointments(
     status: AppointmentStatus = AppointmentStatus.scheduled,
     date: date = date.today(),
     page: int = Query(1, ge=1),
-    limit: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1),
 ):
     output = await fetch_doctor_appointments(
         db=session,
