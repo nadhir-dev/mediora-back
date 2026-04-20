@@ -82,7 +82,7 @@ class Info(BASE):
     description: Mapped[Optional[str]] = mapped_column(nullable=True)
     clinic_posx: Mapped[Optional[str]] = mapped_column(nullable=True)
     clinic_posy: Mapped[Optional[str]] = mapped_column(nullable=True)
-    years_of_experience: Mapped[Optional[int]] = mapped_column(nullable=True)
+    practice_start_date: Mapped[Optional[date]] = mapped_column(nullable=True)
     degree: Mapped[Optional[str]] = mapped_column(nullable=True)
     institution: Mapped[Optional[str]] = mapped_column(nullable=True)
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)

@@ -70,25 +70,26 @@ class ResetPassword(BaseModel):
 class UserFlatResponse(BaseModel):
     id: UUID
     first_name: str
-    last_name: Optional[str]
+    last_name: Optional[str] = None
     username: str
     email: str
     role: str
     is_active: bool
     is_doctor: bool
-    specialty: Optional[str]
+    specialty: Optional[str] = None
     joined_at: datetime
-    picture: Optional[str]
+    picture: Optional[str] = None
 
-    gender: Optional[str]
+    gender: Optional[str] = None
     date_of_birth: Optional[date]
-    phone: Optional[str]
-    clinic_posx: Optional[str]
-    clinic_posy: Optional[str]
-    degree: Optional[str]
-    years_of_experience: Optional[int]
-    description: Optional[str]
-    institution: Optional[str]
+    phone: Optional[str] = None
+    clinic_posx: Optional[str] = None
+    clinic_posy: Optional[str] = None
+    degree: Optional[str] = None
+    practice_start_date: Optional[date]
+    description: Optional[str] = None
+    institution: Optional[str] = None
+    images_of_workplace: Optional[list[str]] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -278,5 +279,11 @@ class AccessToken(BaseModel):
     )
     type: str = Field(examples=["Bearer"])
 
+
 class DoctorListResponse(BaseModel):
     data: list[UserPublic]
+
+
+class DoctorFlatResponse(UserFlatResponse):
+
+    model_config = ConfigDict(from_attributes=True)

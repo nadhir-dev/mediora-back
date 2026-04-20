@@ -7,10 +7,9 @@ from src.config.env import env
 
 engine = create_async_engine(
     env.db_url,
-    echo=True,
     connect_args={"statement_cache_size": 0},
     pool_pre_ping=True,
-    pool_recycle=1800  
+    pool_recycle=1800,
 )
 
 async_session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)

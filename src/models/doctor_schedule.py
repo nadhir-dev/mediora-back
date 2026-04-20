@@ -65,6 +65,7 @@ class RestTimes(BASE):
         ForeignKeyConstraint(
             ["user_id", "day_of_week"],
             ["working_days.user_id", "working_days.day_of_week"],
+            ondelete="cascade",
         ),
         CheckConstraint("finish_time > starting_time", name="finish_after_start"),
     )

@@ -2,8 +2,9 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
 from src.db.connection import get_db
 from src.schemas.doctor_schedule import (
     DoctorService,
@@ -29,18 +30,27 @@ from src.schemas.doctor_schedule import (
     RestTime,
     SpecialSchedules,
 )
-from src.schemas.users import DoctorListResponse, Speciality, SuccessMessage, User
+from src.schemas.users import (
+    DoctorListResponse,
+    ExtendedUserResponse,
+    Speciality,
+    SuccessMessage,
+    User,
+)
 from src.services.authentication import protect
 from src.services.doctor_schedule import (
     add_service,
     check_if_doctor_is_free,
     delete_leave,
+    delete_rest_hours,
+    delete_special_rest_hours,
     delete_special_schedule,
     delete_timeoff,
     delete_working_day,
     fetch_leaves,
     fetch_special_schedules,
     fetch_timeoffs,
+    get_doctor,
     get_doctor_services,
     get_some_doctors,
     get_working_times,
@@ -70,6 +80,15 @@ async def fetch_doctors(
     return {"data": doctors}
 
 
+@schedule_router.get("/{doctor_id}", response_model=ExtendedUserResponse)
+async def fetch_doctor(
+    session: Annotated[AsyncSession, Depends(get_db)], doctor_id: UUID
+):
+    doctor = await get_doctor(db=session, doctor_id=doctor_id)
+
+    return {"data": doctor}
+
+
 @schedule_router.post("/schedule", response_model=WorkingDaysResponse)
 async def add_or_change_working_hours(
     user: Annotated[User, Depends(protect)],
@@ -90,6 +109,17 @@ async def add_or_change_rest_hours(
     rest_time = await modify_rest_hours(db=session, user=user, rest_time=rest_time_info)
 
     return {"data": rest_time}
+
+
+@schedule_router.delete("/schedule/rest/{rest_time_id}")
+async def remove_rest_hours(
+    user: Annotated[User, Depends(protect)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    rest_time_id: UUID,
+    response: Response,
+):
+    await delete_rest_hours(db=session, user=user, rest_time_id=rest_time_id)
+    response.status_code = status.HTTP_204_NO_CONTENT
 
 
 @schedule_router.post("/timeoffs", response_model=TimeOffResponse)
@@ -129,6 +159,21 @@ async def add_or_change_special_rest_hours(
     return {"data": rest_time}
 
 
+@schedule_router.delete(
+    "/special-schedules/rest/{special_rest_time_id}",
+)
+async def remove_special_rest_hours(
+    user: Annotated[User, Depends(protect)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    special_rest_time_id: UUID,
+    response: Response,
+):
+    await delete_special_rest_hours(
+        db=session, user=user, rest_time_id=special_rest_time_id
+    )
+    response.status_code = status.HTTP_204_NO_CONTENT
+
+
 @schedule_router.post("/leaves", response_model=LeaveResponse)
 async def add_leave(
     user: Annotated[User, Depends(protect)],
@@ -153,7 +198,8 @@ async def get_schedule(
 
 
 @schedule_router.get(
-    "{doctor_id}/special-schedules", response_model=SpecialScheduleWithRestTimesResponse
+    "/{doctor_id}/special-schedules",
+    response_model=SpecialScheduleWithRestTimesResponse,
 )
 async def get_special_schedules(
     # user: Annotated[User, Depends(protect)],
@@ -194,52 +240,52 @@ async def get_timeoffs(
     return {"data": timeoffs}
 
 
-@schedule_router.delete("/{id}", response_model=SuccessMessage)
+@schedule_router.delete("/{id}")
 async def remove_working_day(
     user: Annotated[User, Depends(protect)],
     session: Annotated[AsyncSession, Depends(get_db)],
     id: UUID,
+    response: Response,
 ):
     await delete_working_day(db=session, user=user, id=id)
+    response.status_code = status.HTTP_204_NO_CONTENT
 
-    return {"message": "working day removed successfully."}
 
-
-@schedule_router.delete("/special-schedules/{id}", response_model=SuccessMessage)
+@schedule_router.delete("/special-schedules/{id}")
 async def remove_special_schedule(
     user: Annotated[User, Depends(protect)],
     session: Annotated[AsyncSession, Depends(get_db)],
     id: UUID,
+    response: Response,
 ):
     await delete_special_schedule(
         db=session,
         user=user,
         id=id,
     )
+    response.status_code = status.HTTP_204_NO_CONTENT
 
-    return {"message": "special schedule removed successfully."}
 
-
-@schedule_router.delete("/leaves/{id}", response_model=SuccessMessage)
+@schedule_router.delete("/leaves/{id}")
 async def remove_leave(
     user: Annotated[User, Depends(protect)],
     session: Annotated[AsyncSession, Depends(get_db)],
     id: UUID,
+    response: Response,
 ):
     await delete_leave(db=session, user=user, id=id)
+    response.status_code = status.HTTP_204_NO_CONTENT
 
-    return {"message": "special schedule removed successfully."}
 
-
-@schedule_router.delete("/timeoffs/{id}", response_model=SuccessMessage)
+@schedule_router.delete("/timeoffs/{id}")
 async def remove_timeoff(
     user: Annotated[User, Depends(protect)],
     session: Annotated[AsyncSession, Depends(get_db)],
     id: UUID,
+    response: Response,
 ):
     await delete_timeoff(db=session, user=user, id=id)
-
-    return {"message": "special schedule removed successfully."}
+    response.status_code = status.HTTP_204_NO_CONTENT
 
 
 @schedule_router.post("/services", response_model=DoctorServiceResponse)
@@ -274,5 +320,3 @@ async def can_doctor_take_appointments(
     # date: date,
 ):
     await check_if_doctor_is_free(db=session, info=info)
-
-    return {"message": "doctor is free to accept appointments."}

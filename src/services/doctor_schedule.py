@@ -13,10 +13,11 @@ from starlette import status
 from src.config.env import env
 from src.models.Appointments import Appointments
 from src.models.Appointments import AppointmentPaymentSession, DoctorServices
+from src.models.doctor_authentication import DoctorRequest, Media, RequestMedia
 from src.models.doctor_schedule import WorkingDays
 from src.models.users import Users
 from src.schemas.appointment import AppointmentStatus
-from src.schemas.users import Speciality, User
+from src.schemas.users import Speciality, User, UserFlatResponse
 from src.schemas.doctor_schedule import (
     FetchSpecialSchedule,
     IsDoctorFree,
@@ -42,6 +43,59 @@ from src.utils.helpers import (
     format_doctor_special_schedule,
 )
 from src.utils.time import now
+
+
+async def get_doctor(*, db: AsyncSession, doctor_id: UUID):
+    stmt = (
+        select(Users)
+        .where(
+            Users.id == doctor_id, Users.is_active.is_(True), Users.is_doctor.is_(True)
+        )
+        .options(selectinload(Users.info))
+    )
+
+    media_stmt = (
+        select(Media.url)
+        .join(RequestMedia, RequestMedia.document_id == Media.id)
+        .join(DoctorRequest, DoctorRequest.id == RequestMedia.id)
+        .where(
+            DoctorRequest.user_id == doctor_id,
+            RequestMedia.document_type == "images_of_workplace",
+        )
+    )
+
+    user = (await db.scalars(stmt)).one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "there is no doctors matching this id."
+        )
+    images_of_workplace = (await db.scalars(media_stmt)).all()
+
+    data = UserFlatResponse(
+        id=user.id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        is_doctor=user.is_doctor,
+        specialty=user.specialty,
+        joined_at=user.joined_at,
+        picture=user.picture,
+        gender=user.info.gender,
+        date_of_birth=user.info.date_of_birth,
+        phone=user.info.phone,
+        clinic_posx=user.info.clinic_posx,
+        clinic_posy=user.info.clinic_posy,
+        degree=user.info.degree,
+        practice_start_date=user.info.practice_start_date,
+        description=user.info.description,
+        institution=user.info.institution,
+        images_of_workplace=[media for media in images_of_workplace],
+    )
+    return data
 
 
 async def get_some_doctors(
@@ -85,6 +139,23 @@ async def modify_working_time(*, db: AsyncSession, user: User, schedule: WDSched
     return output
 
 
+async def delete_rest_hours(*, db: AsyncSession, user: User, rest_time_id: UUID):
+    if not user.is_doctor:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "you're not authenticated as a doctor."
+        )
+
+    stmt = delete(RestTimes).where(RestTimes.id == rest_time_id).returning(RestTimes.id)
+
+    output = await db.scalar(stmt)
+
+    if output is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "there is no rest hours matching this id."
+        )
+    await db.commit()
+
+
 async def modify_rest_hours(*, db: AsyncSession, user: User, rest_time: RTSchema):
     if not user.is_doctor:
         raise HTTPException(
@@ -98,28 +169,7 @@ async def modify_rest_hours(*, db: AsyncSession, user: User, rest_time: RTSchema
             and_(
                 RestTimes.starting_time < rest_time.finish_time,
                 RestTimes.finish_time > rest_time.starting_time,
-            ),  # or_(
-            #     and_(
-            #         RestTimes.starting_time < rest_time.starting_time,
-            #         RestTimes.finish_time > rest_time.starting_time,
-            #     ),
-            #     and_(
-            #         RestTimes.starting_time < rest_time.finish_time,
-            #         RestTimes.finish_time > rest_time.finish_time,
-            #     ),
-            #     and_(
-            #         RestTimes.starting_time == rest_time.starting_time,
-            #         RestTimes.finish_time == rest_time.finish_time,
-            #     ),
-            #     and_(
-            #         RestTimes.starting_time == rest_time.starting_time,
-            #         RestTimes.finish_time < rest_time.finish_time,
-            #     ),
-            #     and_(
-            #         RestTimes.starting_time > rest_time.starting_time,
-            #         RestTimes.finish_time == rest_time.finish_time,
-            #     ),
-            # ),
+            ),
         )
     )
     existence = await db.scalar(existence_stmt)
@@ -158,6 +208,30 @@ async def modify_rest_hours(*, db: AsyncSession, user: User, rest_time: RTSchema
             )
 
     return output
+
+
+async def delete_special_rest_hours(
+    *, db: AsyncSession, user: User, rest_time_id: UUID
+):
+    if not user.is_doctor:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "you're not authenticated as a doctor."
+        )
+
+    stmt = (
+        delete(SpecialRestTimes)
+        .where(SpecialRestTimes.id == rest_time_id)
+        .returning(SpecialRestTimes.id)
+    )
+
+    output = await db.scalar(stmt)
+
+    if output is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "there is no special rest hours matching this id.",
+        )
+    await db.commit()
 
 
 async def schedule_leave(*, db: AsyncSession, user: User, leave_info: LSchema):
@@ -457,12 +531,15 @@ async def fetch_special_schedules(
         )
 
     stmt = None
-    include_rest_time = (
+    # include_rest_time = (
+    #     SpecialSchedules.date == info.date if info.date is not None else True
+    # )
+    condition = (SpecialSchedules.user_id == doctor_id) & (
         SpecialSchedules.date == info.date if info.date is not None else True
     )
-    condition = (SpecialSchedules.user_id == doctor_id) & include_rest_time
 
     if info.include_rest_times:
+        print("include")
         stmt = (
             select(SpecialSchedules)
             .where(condition)
@@ -474,8 +551,6 @@ async def fetch_special_schedules(
     special_schedule = (await db.scalars(stmt)).all()
 
     return special_schedule
-
-    pass
 
 
 async def fetch_leaves(*, db: AsyncSession, doctor_id: UUID, include_passed_ones: bool):

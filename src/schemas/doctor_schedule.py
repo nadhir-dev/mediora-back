@@ -158,11 +158,11 @@ class RestTimeRange(BaseModel):
 class RestTimes(BaseModel):
     schedule: List[RestTime] | RestTimeRange
 
-    @model_validator(mode="before")
-    def fix(cls, data):
-        if not isinstance(data.get("schedule"), list):
-            data.get("schedule")["day_of_week"] = 0
-        return data
+    # @model_validator(mode="before")
+    # def fix(cls, data):
+    #     if not isinstance(data.get("schedule"), list):
+    #         data.get("schedule")["day_of_week"] = 0
+    #     return data
 
 
 class SpecialSchedule(BaseModel):
@@ -387,11 +387,11 @@ class SpecialRestTimeRange(BaseModel):
 class SpecialRestTimes(BaseModel):
     schedule: List[SpecialRestTime] | SpecialRestTimeRange
 
-    @model_validator(mode="before")
-    def fix(cls, data):
-        if not isinstance(data.get("schedule"), list):
-            data.get("schedule")["day_of_week"] = 0
-        return data
+    # @model_validator(mode="before")
+    # def fix(cls, data):
+    #     if not isinstance(data.get("schedule"), list):
+    #         data.get("schedule")["day_of_week"] = 0
+    #     return data
 
 
 class IsDoctorFree(BaseModel):
@@ -429,7 +429,7 @@ class WorkingDayWithRestTimes(WorkingDayExtended):
 
 
 class SpecialScheduleWithRestTimes(SpecialScheduleExtended):
-    rest_times: list[SpecialRestTimes]
+    rest_times: list[SpecialRestTimeExtended]
 
     model_config = ConfigDict(from_attributes=True)
 
