@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.exc import IntegrityError
 
 # from src.models.appointments import DoctorWallet
+from src.models.Appointments import DoctorWallet
 from src.schemas.users import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.time import now
@@ -207,12 +208,12 @@ async def review_doctor_request(
         )
 
     if reaction == "approve":
-        pass
-        # wallet = DoctorWallet(doctor_id=data.user_id, password=data.wallet_password)
-        # approve_doctor_stmt = (
-        #     update(Users).values(is_doctor=True).where(Users.id == data)
-        # )
-        # db_session.add(wallet)
-        # await db_session.execute(approve_doctor_stmt)
+
+        wallet = DoctorWallet(doctor_id=data.user_id, password=data.wallet_password)
+        approve_doctor_stmt = (
+            update(Users).values(is_doctor=True).where(Users.id == data)
+        )
+        db.add(wallet)
+        await db.execute(approve_doctor_stmt)
 
     await db.commit()
