@@ -80,7 +80,7 @@ async def fetch_doctors(
     return {"data": doctors}
 
 
-@schedule_router.get("/{doctor_id}", response_model=ExtendedUserResponse)
+@schedule_router.get("/info/{doctor_id}", response_model=ExtendedUserResponse)
 async def fetch_doctor(
     session: Annotated[AsyncSession, Depends(get_db)], doctor_id: UUID
 ):
@@ -217,7 +217,7 @@ async def get_special_schedules(
     return {"data": special_schedules}
 
 
-@schedule_router.get("/leaves", response_model=LeavesResponse)
+@schedule_router.get("/leaves/", response_model=LeavesResponse)
 async def get_leaves(
     doctor_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db)],

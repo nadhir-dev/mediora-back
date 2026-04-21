@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
-from sqlalchemy import ForeignKey, DateTime, Date, null
+from sqlalchemy import ForeignKey, DateTime, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db import BASE
 from src.utils.time import now

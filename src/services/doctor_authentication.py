@@ -200,7 +200,7 @@ async def review_doctor_request(
         .returning(DoctorRequest.user_id, DoctorRequest.wallet_password)
     )
 
-    data = await db.scalar(stmt)
+    data = (await db.execute(stmt)).one_or_none()
 
     if not data:
         raise HTTPException(
@@ -208,10 +208,11 @@ async def review_doctor_request(
         )
 
     if reaction == "approve":
+        user_id, wallet_password = data
 
-        wallet = DoctorWallet(doctor_id=data.user_id, password=data.wallet_password)
+        wallet = DoctorWallet(doctor_id=user_id, password=wallet_password)
         approve_doctor_stmt = (
-            update(Users).values(is_doctor=True).where(Users.id == data)
+            update(Users).values(is_doctor=True).where(Users.id == user_id)
         )
         db.add(wallet)
         await db.execute(approve_doctor_stmt)
