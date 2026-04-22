@@ -43,6 +43,7 @@ from src.services.doctor_schedule import (
     check_if_doctor_is_free,
     delete_leave,
     delete_rest_hours,
+    delete_service,
     delete_special_rest_hours,
     delete_special_schedule,
     delete_timeoff,
@@ -52,6 +53,7 @@ from src.services.doctor_schedule import (
     fetch_timeoffs,
     get_doctor,
     get_doctor_services,
+    get_service,
     get_some_doctors,
     get_working_times,
     modify_rest_hours,
@@ -217,7 +219,7 @@ async def get_special_schedules(
     return {"data": special_schedules}
 
 
-@schedule_router.get("/leaves/", response_model=LeavesResponse)
+@schedule_router.get("/leaves", response_model=LeavesResponse)
 async def get_leaves(
     doctor_id: UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -288,6 +290,15 @@ async def remove_timeoff(
     response.status_code = status.HTTP_204_NO_CONTENT
 
 
+@schedule_router.get("/services/{service_id}", response_model=DoctorServiceResponse)
+async def fetch_service(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    service_id: UUID,
+):
+    service = await get_service(db=session, service_id=service_id)
+    return {"data": service}
+
+
 @schedule_router.post("/services", response_model=DoctorServiceResponse)
 async def add_new_service(
     user: Annotated[User, Depends(protect)],
@@ -311,10 +322,22 @@ async def fetch_doctor_services(
     return {"data": services}
 
 
+@schedule_router.delete("/services/{service_id}")
+async def remove_service(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(protect)],
+    service_id: UUID,
+    response: Response,
+):
+
+    await delete_service(db=session, user=user, service_id=service_id)
+
+    response.status_code = status.HTTP_204_NO_CONTENT
+
+
 @schedule_router.get("/is-free", response_model=SuccessMessage)
 async def can_doctor_take_appointments(
     session: Annotated[AsyncSession, Depends(get_db)],
-    # user: Annotated[User, Depends(protect)],
     info: Annotated[IsDoctorFree, Query()],
     # service_id: UUID,
     # date: date,

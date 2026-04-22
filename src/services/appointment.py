@@ -306,6 +306,12 @@ async def fetch_appointment(*, db: AsyncSession, user: User, appointment_id: UUI
                 Users.joined_at,
                 Users.picture,
             ),
+            joinedload(Appointments.service).load_only(
+                DoctorServices.price,
+                DoctorServices.name,
+                DoctorServices.description,
+                DoctorServices.created_at,
+            ),
         )
     )
 

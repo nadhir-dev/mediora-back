@@ -733,8 +733,7 @@ async def add_service(*, db: AsyncSession, user: User, service_info: DoctorServi
     try:
         await db.commit()
 
-    except IntegrityError as e:
-        err_msg = str(e.orig)
+    except IntegrityError:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "you already have a service with this name."
         )
@@ -761,6 +760,42 @@ async def get_doctor_services(*, db: AsyncSession, doctor_id: UUID):
     services = (await db.scalars(services_stmt)).all()
 
     return services
+
+
+async def get_service(*, db: AsyncSession, service_id: UUID):
+
+    service_stmt = select(DoctorServices).where(DoctorServices.id == service_id)
+    service = (await db.scalars(service_stmt)).one_or_none()
+
+    if service is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "this id matches no services.")
+
+    return service
+
+
+async def delete_service(*, db: AsyncSession, user: User, service_id: UUID):
+    stmt = select(Users.is_doctor).where(Users.id == user.id, Users.is_active.is_(True))
+
+    is_doctor = await db.scalar(stmt)
+
+    if is_doctor is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no users with this id.")
+
+    if not is_doctor:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "only doctors are allowed.")
+
+    stmt = (
+        delete(DoctorServices)
+        .where(DoctorServices.doctor_id == user.id, DoctorServices.id == service_id)
+        .returning(DoctorServices.id)
+    )
+
+    service = await db.scalar(stmt)
+
+    if service is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "none of your services match this id."
+        )
 
 
 async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):

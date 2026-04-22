@@ -27,6 +27,9 @@ class Appointments(BASE):
     status: Mapped[str] = mapped_column(default=AppointmentStatus.scheduled.value)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(True), default=now)
 
+    service: Mapped["DoctorServices"] = relationship(
+        "DoctorServices", foreign_keys=[service_id]
+    )
     doctor: Mapped["Users"] = relationship("Users", foreign_keys=[doctor_id])
     patient: Mapped["Users"] = relationship("Users", foreign_keys=[patient_id])
 

@@ -455,6 +455,7 @@ class DoctorService(BaseModel):
 class DoctorServiceExtended(BaseModel):
     id: UUID
     doctor_id: UUID
+    price: int
 
     name: str = Field(min_length=1)
     description: str = Field(min_length=1)

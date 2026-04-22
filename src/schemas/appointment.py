@@ -53,9 +53,17 @@ class Appointment(BaseModel):
     status: AppointmentStatus
 
 
+class ServiceForAppointment(BaseModel):
+    price: int
+    name: str
+    description: str
+    created_at: datetime
+
+
 class AppointmentWithUsersPopulated(Appointment):
     doctor: UserResponseForAppointment
     patient: UserResponseForAppointment
+    service: ServiceForAppointment
 
 
 class AppointmentResponse(BaseModel):
