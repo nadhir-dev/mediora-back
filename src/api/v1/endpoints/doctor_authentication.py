@@ -3,17 +3,23 @@ from typing import Annotated
 from starlette import status
 from src.services.doctor_authentication import (
     fetch_my_request,
+    reject_doctor_authentication_request,
     saveRequest,
     fetch_doctors_requests,
     fetch_doctor_request,
-    review_doctor_request,
+    approve_doctor_authentication_request,
 )
 from fastapi import APIRouter, Response, Depends, Body, Query
 from src.schemas.users import SuccessMessage, User
 from src.services.authentication import protect
 from src.db import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.schemas.doctor_requests import DoctorRequest, DoctorRequests, RequestDocuments
+from src.schemas.doctor_requests import (
+    DoctorRequest,
+    DoctorRequests,
+    RequestApprovement,
+    RequestDocuments,
+)
 
 
 doctor_approvement_router = APIRouter(prefix="/doctors-approvement")
@@ -71,9 +77,13 @@ async def approve_doctor_request(
     user: Annotated[User, Depends(protect)],
     session: Annotated[AsyncSession, Depends(get_db)],
     request_id: str,
+    approvement_data: RequestApprovement,
 ):
-    await review_doctor_request(
-        db=session, user=user, reaction="approve", request_id=request_id
+    await approve_doctor_authentication_request(
+        db=session,
+        user=user,
+        request_id=request_id,
+        approvment_data=approvement_data,
     )
 
     return {"message": "request approved."}
@@ -89,8 +99,8 @@ async def reject_doctor_request(
     session: Annotated[AsyncSession, Depends(get_db)],
     request_id: str,
 ):
-    await review_doctor_request(
-        db=session, user=user, reaction="reject", request_id=request_id
+    await reject_doctor_authentication_request(
+        db=session, user=user, request_id=request_id
     )
 
     return {"message": "request rejected."}

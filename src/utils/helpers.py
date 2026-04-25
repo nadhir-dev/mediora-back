@@ -166,4 +166,4 @@ def format_special_doctor_rest_time(s: SRTSchema, user_id: UUID):
 #             )
 #             for i in range(s.schedule.start, s.schedule.end + 1)  # type:ignore
 #         ]
-#     pass
+#

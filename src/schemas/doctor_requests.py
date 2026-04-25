@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.schemas.users import Email, Password
 
@@ -30,7 +30,7 @@ class RequestDocuments(BaseModel):
     employment_certificate: PDF
     images_of_workplace: List[ImageFile]
     commercial_registration_certificate: ImageFile
-    wallet_password: Password = "SecurePass123!"
+    wallet_password: Password = Field(examples=["SecurePass123!"])
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -89,3 +89,14 @@ class ExtendedRequest(BaseModel):
 
 class DoctorRequest(BaseModel):
     data: ExtendedRequest
+
+
+class RequestApprovement(BaseModel):
+    institution: str = Field(min_length=1)
+    practice_start_date: date = Field()
+
+    @field_validator("practice_start_date")
+    def validate_practice_start_date(cls, v: date):
+        if v > date.today():
+            raise ValueError("practice_start_date cannot be in the future.")
+        return v

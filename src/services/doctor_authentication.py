@@ -10,10 +10,10 @@ from src.schemas.users import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.utils.time import now
 
-from src.schemas.doctor_requests import RequestDocuments
+from src.schemas.doctor_requests import RequestApprovement, RequestDocuments
 from src.utils.authentication import gen_id
 from src.models.doctor_authentication import DoctorRequest, RequestMedia, Media
-from src.models.users import Users
+from src.models.users import Info, Users
 
 
 async def saveRequest(*, db: AsyncSession, user: User, docs: RequestDocuments):
@@ -183,10 +183,9 @@ async def fetch_doctor_request(*, db: AsyncSession, user: User, request_id: str)
     return request
 
 
-async def review_doctor_request(
+async def reject_doctor_authentication_request(
     *,
     db: AsyncSession,
-    reaction: Literal["approve", "reject"],
     user: User,
     request_id: str,
 ):
@@ -207,14 +206,51 @@ async def review_doctor_request(
             status.HTTP_404_NOT_FOUND, "request not found or has already been reviewed."
         )
 
-    if reaction == "approve":
-        user_id, wallet_password = data
+    await db.commit()
 
-        wallet = DoctorWallet(doctor_id=user_id, password=wallet_password)
-        approve_doctor_stmt = (
-            update(Users).values(is_doctor=True).where(Users.id == user_id)
+
+async def approve_doctor_authentication_request(
+    *,
+    db: AsyncSession,
+    user: User,
+    request_id: str,
+    approvment_data: RequestApprovement,
+):
+
+    if user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden.")
+
+    stmt = (
+        update(DoctorRequest)
+        .values(reviewed=True, reviewed_at=now())
+        .where(DoctorRequest.id == request_id, DoctorRequest.reviewed == False)
+        .returning(DoctorRequest.user_id, DoctorRequest.wallet_password)
+    )
+
+    data = (await db.execute(stmt)).one_or_none()
+
+    if not data:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "request not found or has already been reviewed."
         )
-        db.add(wallet)
-        await db.execute(approve_doctor_stmt)
+
+    user_id, wallet_password = data
+    wallet = DoctorWallet(doctor_id=user_id, password=wallet_password)
+
+    approve_doctor_stmt = (
+        update(Users).values(is_doctor=True).where(Users.id == user_id)
+    )
+    add_doctor_info_stmt = (
+        update(Info)
+        .values(
+            institution=approvment_data.institution,
+            practice_start_date=approvment_data.practice_start_date,
+        )
+        .where(Info.id == user_id)
+    )
+
+    db.add(wallet)
+    await db.execute(approve_doctor_stmt)
+    await db.execute(add_doctor_info_stmt)
 
     await db.commit()

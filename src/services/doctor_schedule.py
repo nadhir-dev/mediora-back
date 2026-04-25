@@ -742,7 +742,7 @@ async def add_service(*, db: AsyncSession, user: User, service_info: DoctorServi
 
 
 async def get_doctor_services(*, db: AsyncSession, doctor_id: UUID):
-    pass
+
     stmt = select(Users.is_doctor).where(
         Users.id == doctor_id, Users.is_active.is_(True)
     )
