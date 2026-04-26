@@ -1,4 +1,3 @@
-from random import randint
 from typing import Annotated, TYPE_CHECKING, Any
 from datetime import datetime, UTC
 from fastapi import Request
@@ -7,7 +6,6 @@ from argon2 import PasswordHasher
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, update, insert, exists
-from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 from src.models.users import Users, Auth, Info, Sessions, PendingEmails
@@ -22,6 +20,12 @@ from src.config.env import env
 from src.utils.authentication import (
     get_token,
     parse_google_provided_data,
+)
+from src.utils.helpers import (
+    get_user_from_cache,
+    remove_user_from_cache,
+    save_user_in_cache,
+    serialize_sqlalchemy,
 )
 from src.utils.time import now, after
 
@@ -289,7 +293,7 @@ async def reset_password(*, db: AsyncSession, code: str):
 
 
 async def update_password_with_token(
-    *, db: AsyncSession, data: ResetPassword, device_id: str | None
+    *, db: AsyncSession, data: ResetPassword, device_id: str | None, request: Request
 ):
     hashed_token = hash_token(data.reset_token)
 
@@ -329,13 +333,16 @@ async def update_password_with_token(
         refresh_token=refresh_token,
         refresh_token_expires=after(days=60),
         device_id=device_id if device_id else str(gen_id()),
-        # auth_id=user_auth.id,
         user_id=user_auth.id,
     )
 
     await db.execute(insert_stmt)
 
     await db.commit()
+
+    user_id = user_auth.id
+    redis_key = f"user:{user_id}"
+    await remove_user_from_cache(request.app.state.redis, redis_key)
 
     return refresh_token, access_token
 
@@ -440,24 +447,43 @@ async def protect(db: Annotated[AsyncSession, Depends(get_db)], request: Request
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid token or has expired.",
         )
+    user_id = decoded["id"]
 
-    stmt = (
-        select(Users)
-        .where(Users.id == decoded["id"])
-        .options(joinedload(Users.auth).load_only(Auth.last_password_reset))
-    )
+    redis_key = f"user:{user_id}"
 
-    user = (await db.scalars(stmt)).one_or_none()
+    cache = await get_user_from_cache(request.app.state.redis, redis_key)
+    if cache:
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid credentials.",
+        lpr = datetime.fromisoformat(cache["last_password_reset"])
+        del cache["last_password_reset"]
+
+        user = Users(**cache)
+    else:
+
+        stmt = (
+            select(Users, Auth.last_password_reset)
+            .join(Users.auth)
+            .where(Users.id == user_id)
         )
+
+        data = (await db.execute(stmt)).one_or_none()
+
+        if not data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid credentials.",
+            )
+        user, lpr = data
+
+        user_to_cache = {
+            **serialize_sqlalchemy(user),
+            "last_password_reset": lpr.isoformat(),
+        }
+        await save_user_in_cache(request.app.state.redis, redis_key, user_to_cache)
 
     iat = datetime.fromtimestamp(decoded["exp"] - 60 * 15, UTC)  # type ignore
 
-    if user.auth.last_password_reset > iat:
+    if lpr > iat:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="you changed you're password lately, please login again.",
@@ -586,7 +612,8 @@ async def change_password(
     device_id: str,
     user: Any,
     current_password: str,
-    new_password: str
+    new_password: str,
+    request: Request,
 ):
     stmt = select(Auth).where(Auth.id == user.id)
     auth = (await db.scalars(stmt)).one()
@@ -617,12 +644,15 @@ async def change_password(
         refresh_token_expires=after(days=60),
         device_id=device_id,
         user_id=user.id,
-        # auth_id=user.id,
     )
 
     await db.execute(expired_sessions_stmt)
     await db.execute(new_session_stmt)
 
     await db.commit()
+
+    user_id = auth.id
+    redis_key = f"user:{user_id}"
+    await remove_user_from_cache(request.app.state.redis, redis_key)
 
     return refresh_token, gen_access_token(user.id)

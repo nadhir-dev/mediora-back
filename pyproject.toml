@@ -28,6 +28,7 @@ websockets = "^16.0"
 resend = "^2.26.0"
 alembic = "^1.18.4"
 psycopg = "^3.3.3"
+redis = "^7.4.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

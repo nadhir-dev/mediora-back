@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from src.config.redis_client import client as redis_client
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
 from slowapi.errors import RateLimitExceeded
@@ -15,9 +16,18 @@ from src.config.http import too_many_request, allowed_origins
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # runs on startup
-    await init_db()
-    yield
-    # runs on shutdown
+    try:
+        await init_db()
+        pong = await redis_client.ping()  # type: ignore
+        print(pong)
+        app.state.redis = redis_client
+        yield
+    except Exception:
+        print("startup failed")
+        raise
+    finally:
+        # runs on shutdown
+        await app.state.redis.aclose()
 
 
 app = FastAPI(lifespan=lifespan)

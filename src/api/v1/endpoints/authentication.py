@@ -307,7 +307,7 @@ async def change_password_with_token(
 ):
     device_id = get_device_id(request=request)
     refresh_token, access_token = await update_password_with_token(
-        db=session, data=body, device_id=device_id
+        db=session, data=body, device_id=device_id, request=request
     )
 
     response.set_cookie(
@@ -377,7 +377,7 @@ async def update_password(
 ):
     device_id = get_device_id(request, required=True)
     refresh_token, access_token = await change_password(
-        db=session, device_id=device_id, user=user, current_password=current_password, new_password=password  # type: ignore
+        db=session, device_id=device_id, user=user, current_password=current_password, new_password=password, request=request  # type: ignore
     )
 
     response.set_cookie(

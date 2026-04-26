@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import json
 
 from fastapi import HTTPException, Request
 from jose import ExpiredSignatureError, JWTError, jwt
@@ -16,6 +17,11 @@ from src.schemas.users import UpdateUser, UserFlatResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.utils.authentication import gen_id, get_token
+from src.utils.helpers import (
+    get_user_from_cache,
+    remove_user_from_cache,
+    serialize_sqlalchemy,
+)
 
 
 async def update_user_data(*, db: AsyncSession, user: Users, updates: UpdateUser):
@@ -114,12 +120,11 @@ async def get_user_data(*, db: AsyncSession, request: Request):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid token or has expired.",
         )
-
+    user_id = decoded["id"]
     stmt = (
         select(Users)
-        .where(Users.id == decoded["id"])
+        .where(Users.id == user_id)
         .options(
-            joinedload(Users.auth).load_only(Auth.last_password_reset),
             joinedload(Users.info),
         )
     )
@@ -132,13 +137,9 @@ async def get_user_data(*, db: AsyncSession, request: Request):
             detail="invalid credentials.",
         )
 
-    iat = datetime.fromtimestamp(decoded["exp"] - 60 * 15, UTC)  # type ignore
+    redis_key = f"user:{user_id}"
+    await remove_user_from_cache(request.app.state.redis, redis_key)
 
-    if user.auth.last_password_reset > iat:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="you changed you're password lately, please login again.",
-        )
     response = UserFlatResponse(
         id=user.id,
         first_name=user.first_name,

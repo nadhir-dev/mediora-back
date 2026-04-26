@@ -88,10 +88,6 @@ async def approve_doctor_request(
 
     return {"message": "request approved."}
 
-    # check if user is admin
-    # if that request is alrady validated or rejected throw an error
-    # validate that request
-
 
 @doctor_approvement_router.delete("/{request_id}/reject", response_model=SuccessMessage)
 async def reject_doctor_request(
@@ -104,6 +100,3 @@ async def reject_doctor_request(
     )
 
     return {"message": "request rejected."}
-    # check if user is admin
-    # if that request is alrady validated or rejected throw an error
-    # reject that request

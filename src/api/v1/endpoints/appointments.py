@@ -2,7 +2,6 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 from fastapi import Path, Query, Request
-from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Body, Depends, Response
 from starlette import status
@@ -15,6 +14,7 @@ from src.schemas.appointment import (
     DoctorAppointmentsResponse,
     ExtendedAppointmentResponse,
     MakeAppointment,
+    PatientAppointmentsResponse,
 )
 from src.schemas.users import SuccessMessage, User
 
@@ -34,7 +34,7 @@ from src.services.authentication import protect
 appointments_router = APIRouter(prefix="/appointments")
 
 
-@appointments_router.get("/", response_model=DoctorAppointmentsResponse)
+@appointments_router.get("/", response_model=PatientAppointmentsResponse)
 async def get_appointments(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(protect)],
@@ -88,25 +88,12 @@ async def make_appointment(
 @appointments_router.post("/chargily-webhook", include_in_schema=False)
 async def chargily_webhook_success(
     session: Annotated[AsyncSession, Depends(get_db)],
-    # user: Annotated[User, Depends(protect)],
     request: Request,
 ):
 
     await handle_chargilypay_webhook(db=session, request=request)
 
     return {"message": "success"}
-
-
-# @appointments_router.get("/chargily-webhook", include_in_schema=False)
-# async def chargily_webhoo_success(
-#     session: Annotated[AsyncSession, Depends(get_db)],
-#     # user: Annotated[User, Depends(protect)],
-#     request: Request,
-# ):
-
-#     await handle_chargilypay_webhook(db=session, request=request)
-
-#     return {"message": "success"}
 
 
 @appointments_router.get(

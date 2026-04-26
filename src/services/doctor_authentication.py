@@ -156,6 +156,7 @@ async def fetch_doctors_requests(
                 Users.last_name,
                 Users.email,
                 Users.picture,
+                Users.specialty,
             )
         )
     )

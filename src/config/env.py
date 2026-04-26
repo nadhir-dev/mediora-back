@@ -6,6 +6,7 @@ class Env(BaseSettings):
     production: bool = Field(alias="PRODUCTION")
 
     db_url: str = Field(alias="DB_URL")
+    redis_url: str = Field(alias="REDIS_URL")
     port: int = Field(alias="PORT")
     jwt_secret: str = Field(alias="JWT_SECRET")
     development_url: str = Field(alias="DEVELOPMENT_URL")

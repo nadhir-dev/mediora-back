@@ -4,6 +4,8 @@ from secrets import token_hex, token_urlsafe
 from random import randint
 import hmac
 from hashlib import sha256
+
+from pydantic import ValidationError
 from src.utils.validators import is_username, is_email
 from src.utils.time import after
 from fastapi import Request, HTTPException, status
@@ -105,8 +107,8 @@ def hash_token(token: str) -> str:
 def get_credentials(identifier: str, password: str) -> SigninCredentials:
     try:
         v = SigninCredentials(identifier=identifier, password=password)
-    except Exception as e:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=e)
+    except ValidationError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=e.errors())
     return v
 
 

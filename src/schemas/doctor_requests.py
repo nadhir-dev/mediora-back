@@ -4,7 +4,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.schemas.users import Email, Password
+from src.schemas.users import Email, Password, Speciality
 
 
 class PDF(BaseModel):
@@ -41,6 +41,7 @@ class DoctorRequesting(BaseModel):
     last_name: Optional[str] = None
     email: Email
     picture: Optional[str] = None
+    specialty: Speciality
 
     model_config = ConfigDict(from_attributes=True)
 

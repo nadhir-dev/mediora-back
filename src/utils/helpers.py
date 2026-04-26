@@ -1,4 +1,8 @@
-from typing import List
+from datetime import datetime
+import json
+from typing import Any, List
+
+from src.config.env import env
 from src.schemas.doctor_schedule import WorkingDays as WKSchema
 from src.schemas.doctor_schedule import RestTimes as RTSchema
 from src.schemas.doctor_schedule import SpecialSchedules as SSSchema
@@ -7,6 +11,8 @@ from src.schemas.doctor_schedule import SpecialRestTimes as SRTSchema
 from src.utils.authentication import gen_id
 
 from uuid import UUID
+
+from redis import Redis
 
 
 def format_doctor_schedule(s: WKSchema, user_id: UUID):
@@ -139,31 +145,38 @@ def format_special_doctor_rest_time(s: SRTSchema, user_id: UUID):
         ]
 
 
-# def format_doctor_schedule(s: WKSchema, user_id: UUID):
+def serialize_sqlalchemy(obj):
+    data = {}
 
-#     if isinstance(s.schedule, List):
+    for c in obj.__table__.columns:
+        value = getattr(obj, c.name)
 
-#         return [
-#             WorkingDays(
-#                 id=gen_id(),
-#                 user_id=user_id,
-#                 day_of_week=v.schedule.day_of_week,
-#                 starting_time=v.schedule.starting_time,
-#                 finish_time=v.schedule.finish_time,
-#             )
-#             for _, v in s
-#         ]
+        if isinstance(value, UUID):
+            value = str(value)
 
-#     else:
-#         # isinstance(s.schedule, WKSchema)
-#         return [
-#             WorkingDays(
-#                 id=gen_id(),
-#                 user_id=user_id,
-#                 day_of_week=i,
-#                 starting_time=s.schedule.starting_time,  # type:ignore
-#                 finish_time=s.schedule.finish_time,  # type:ignore
-#             )
-#             for i in range(s.schedule.start, s.schedule.end + 1)  # type:ignore
-#         ]
-#
+        elif isinstance(value, datetime):
+            value = value.isoformat()
+
+        data[c.name] = value
+
+    return data
+
+
+async def save_user_in_cache(redis: Redis, key: str, value: Any):
+    await redis.set(
+        key,
+        json.dumps(value),
+        ex=env.access_token_expiration,
+    )
+
+
+async def get_user_from_cache(redis: Redis, key: str):
+    value = await redis.get(key)
+    if value is None:
+        return None
+
+    return json.loads(value)
+
+
+async def remove_user_from_cache(redis: Redis, key: str):
+    await redis.delete(key)

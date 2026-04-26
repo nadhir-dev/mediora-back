@@ -217,7 +217,7 @@ async def fetch_patient_appointments(
         select(Appointments)
         .where(condition)
         .options(
-            selectinload(Appointments.patient).load_only(
+            selectinload(Appointments.doctor).load_only(
                 Users.first_name,
                 Users.last_name,
                 Users.username,

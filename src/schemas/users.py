@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from pydantic import (
     BaseModel,
     Field,
+    field_serializer,
     field_validator,
     StringConstraints,
     ConfigDict,
@@ -165,8 +166,14 @@ class UpdateUser(BaseModel):
     gender: Optional[Gender] = None
     date_of_birth: Optional[date] = None
     description: Optional[str] = None
+    # clinic_posx: Optional[float] = None
+    # clinic_posy: Optional[float] = None
     clinic_posx: Optional[str] = None
     clinic_posy: Optional[str] = None
+
+    # @field_serializer("clinic_posx", "clinic_posy")
+    # def serialize_coords(self, value):
+    #     return str(value)
 
     @model_validator(mode="after")
     def check_not_empty(self) -> Self:
@@ -177,8 +184,18 @@ class UpdateUser(BaseModel):
         if (self.clinic_posx and not self.clinic_posy) or (
             not self.clinic_posx and self.clinic_posy
         ):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "nothing to update.")
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "please provide both x and y coordinates."
+            )
+        if self.clinic_posx and self.clinic_posy:
 
+            try:
+                float(self.clinic_posx)
+                float(self.clinic_posy)
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST, "invalid both x and y coordinates."
+                )
         return self
 
     model_config = ConfigDict(extra="ignore")
