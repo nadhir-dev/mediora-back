@@ -166,7 +166,7 @@ async def save_user_in_cache(redis: Redis, key: str, value: Any):
     await redis.set(
         key,
         json.dumps(value),
-        ex=env.access_token_expiration,
+        ex=env.user_cache_expiration,
     )
 
 

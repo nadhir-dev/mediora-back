@@ -39,6 +39,7 @@ class Env(BaseSettings):
 
     forever: int = Field(alias="FOREVER")
     creation_token_expiration: int = Field(alias="CREATION_TOKEN_EXPIRES")
+    user_cache_expiration: int = Field(alias="USER_CACHE_EXPIRATION")
     access_token_expiration: int = Field(alias="ACCESS_TOKEN_EXPIRES")
     refresh_token_expiration: int = Field(alias="REFRESH_TOKEN_EXPIRES")
 
