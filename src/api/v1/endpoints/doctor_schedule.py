@@ -339,7 +339,7 @@ async def remove_service(
 async def can_doctor_take_appointments(
     session: Annotated[AsyncSession, Depends(get_db)],
     info: Annotated[IsDoctorFree, Query()],
-    # service_id: UUID,
-    # date: date,
 ):
     await check_if_doctor_is_free(db=session, info=info)
+
+    return {"message": "doctor is free to take appointments."}
