@@ -25,6 +25,7 @@ async def init_db():
     import src.models.doctor_schedule
     import src.models.messaging
     import src.models.Appointments
+    import src.models.feedback
 
     #
 

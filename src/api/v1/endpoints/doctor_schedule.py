@@ -1,7 +1,6 @@
 from datetime import date
 from typing import Annotated
 from uuid import UUID
-
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status

@@ -18,16 +18,14 @@ async def lifespan(app: FastAPI):
     # runs on startup
     try:
         await init_db()
-        pong = await redis_client.ping()  # type: ignore
-        print(pong)
+        await redis_client.ping()  # type: ignore
         app.state.redis = redis_client
         yield
-    except Exception:
-        print("startup failed")
-        raise
-    finally:
-        # runs on shutdown
         await app.state.redis.aclose()
+
+    except Exception:
+        raise
+        # runs on shutdown
 
 
 app = FastAPI(lifespan=lifespan)
