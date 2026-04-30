@@ -46,8 +46,8 @@ async def create_appointment_session(
 
     existing_session_url = (await db.scalars(stmt)).one_or_none()
 
-    if existing_session_url:
-        return existing_session_url
+    # if existing_session_url:
+    #     return existing_session_url
 
     await check_if_doctor_is_free(
         db=db,
@@ -58,14 +58,16 @@ async def create_appointment_session(
 
     service = await db.get(DoctorServices, appointment_info.service_id)
 
-    if service.doctor_id == user.id:  # type:ignore
+    if service.doctor_id == user.id:  # type: ignore
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "you cannot make an appointment with yourself."
         )
 
     async with httpx.AsyncClient() as client:
 
-        success_url = f"{env.url}/appointments/chargily-webhook"
+        success_url = env.chargily_success_url
+
+        webhook_url = f"{env.url}/appointments/chargily-webhook"
 
         response = await client.post(
             url=env.chargily_checkout_endpoint,
@@ -74,9 +76,10 @@ async def create_appointment_session(
                 "Content-Type": "application/json",
             },
             json={
-                "amount": service.price,  # type:ignore
+                "amount": service.price,  # type: ignore
                 "currency": "dzd",
                 "success_url": success_url,
+                "webhook_endpoint": webhook_url,
             },
         )
 
@@ -87,12 +90,13 @@ async def create_appointment_session(
         patient_id=user.id,
         date=appointment_info.date,
         expires_at=after(minutes=30),
-        checkout_url=data["checkout_url"],  # type:ignore
+        checkout_url=data["checkout_url"],  # type: ignore
     )
     db.add(session)
 
     await db.commit()
-    return data["checkout_url"]  # type:ignore
+    print(data)
+    return data["checkout_url"]  # type: ignore
 
 
 async def handle_chargilypay_webhook(

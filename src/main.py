@@ -42,8 +42,8 @@ app.add_middleware(
     https_only=False,
 )
 
-if production:
-    app.add_middleware(HTTPSRedirectMiddleware)
+# if production:
+#     app.add_middleware(HTTPSRedirectMiddleware)
 
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -60,7 +60,7 @@ app.add_middleware(
 app.include_router(router=router)
 
 
-app.add_exception_handler(RateLimitExceeded, too_many_request)  # type:ignore
+app.add_exception_handler(RateLimitExceeded, too_many_request)  # type: ignore
 
 if production:
     app.add_exception_handler(Exception, unexpected)
