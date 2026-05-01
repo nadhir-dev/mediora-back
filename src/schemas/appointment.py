@@ -34,7 +34,7 @@ class MakeAppointment(BaseModel):
 
 class UserResponseForAppointment(BaseModel):
     first_name: str
-    last_name: str
+    last_name: Optional[str] = None
     username: str
     is_doctor: bool
     specialty: Optional[str] = None

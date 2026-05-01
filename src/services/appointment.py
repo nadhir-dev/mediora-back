@@ -59,8 +59,9 @@ async def create_appointment_session(
     )
 
     service = await db.get(DoctorServices, appointment_info.service_id)
-
+    print(service.doctor_id, user.id)  # type: ignore
     if service.doctor_id == user.id:  # type: ignore
+
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "you cannot make an appointment with yourself."
         )
