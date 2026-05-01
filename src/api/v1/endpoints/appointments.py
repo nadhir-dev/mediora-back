@@ -2,10 +2,11 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 from fastapi import Path, Query, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Body, Depends, Response
 from starlette import status
-
+from pathlib import Path as p
 from src.db.connection import get_db
 from src.schemas.appointment import (
     AppointmentResponse,
@@ -29,7 +30,6 @@ from src.services.appointment import (
     settle_appointment,
 )
 from src.services.authentication import protect
-
 
 appointments_router = APIRouter(prefix="/appointments")
 
@@ -94,6 +94,15 @@ async def chargily_webhook_success(
     await handle_chargilypay_webhook(db=session, request=request)
 
     return {"message": "success"}
+
+
+@appointments_router.get("/redirect", include_in_schema=False)
+async def redirect_to_app():
+    BASE_DIR = p(__file__).resolve().parent
+
+    file_path = BASE_DIR.parent.parent.parent / "assets" / "redirect-to-app.html"
+
+    return FileResponse(file_path)
 
 
 @appointments_router.get(

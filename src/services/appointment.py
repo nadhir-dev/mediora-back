@@ -37,7 +37,7 @@ async def create_appointment_session(
     appointment_info: MakeAppointment,
 ):
 
-    stmt = select(AppointmentPaymentSession.checkout_url).where(
+    stmt = select(AppointmentPaymentSession).where(
         AppointmentPaymentSession.service_id == appointment_info.service_id,
         AppointmentPaymentSession.patient_id == user.id,
         AppointmentPaymentSession.is_expired == False,
@@ -46,8 +46,10 @@ async def create_appointment_session(
 
     existing_session_url = (await db.scalars(stmt)).one_or_none()
 
-    # if existing_session_url:
-    #     return existing_session_url
+    if existing_session_url:
+
+        existing_session_url.is_expired = True
+        await db.commit()
 
     await check_if_doctor_is_free(
         db=db,
@@ -65,7 +67,7 @@ async def create_appointment_session(
 
     async with httpx.AsyncClient() as client:
 
-        success_url = env.chargily_success_url
+        success_url = f"{env.url}/appointments/redirect"
 
         webhook_url = f"{env.url}/appointments/chargily-webhook"
 
@@ -85,6 +87,13 @@ async def create_appointment_session(
 
         data = response.json()
 
+    if response.status_code >= 400:
+        print(response)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "something went wrong creating your checkout.",
+        )
+
     session = AppointmentPaymentSession(
         service_id=appointment_info.service_id,
         patient_id=user.id,
@@ -95,7 +104,6 @@ async def create_appointment_session(
     db.add(session)
 
     await db.commit()
-    print(data)
     return data["checkout_url"]  # type: ignore
 
 

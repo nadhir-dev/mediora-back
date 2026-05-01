@@ -1,6 +1,8 @@
+from pathlib import Path
 from typing import Annotated
 from fastapi import APIRouter, Body, Depends
 from fastapi import Request
+from fastapi.responses import FileResponse
 from src.db.connection import get_db
 from src.models.users import Users
 from src.schemas.doctor_requests import ImageFile
@@ -13,7 +15,6 @@ from src.services.authentication import protect
 from src.services.users import add_profile_picture, get_user_data, update_user_data
 
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 users_router = APIRouter(prefix="/users")
 

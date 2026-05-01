@@ -122,7 +122,6 @@ async def modify_working_time(*, db: AsyncSession, user: User, schedule: WDSched
         )
 
     data = format_doctor_schedule(schedule, user.id)
-    print(data)
     stmt = insert(WorkingDays).values(data)
     stmt = stmt.on_conflict_do_update(
         index_elements=["day_of_week", "user_id"],
@@ -244,7 +243,7 @@ async def schedule_leave(*, db: AsyncSession, user: User, leave_info: LSchema):
         leave_info.finish_date
         if leave_info.finish_date is not None
         else leave_info.starting_date
-        + timedelta(days=leave_info.period_in_days)  # type:ignore
+        + timedelta(days=leave_info.period_in_days)  # type: ignore
     )
 
     reason = leave_info.reason
@@ -291,7 +290,7 @@ async def schedule_timeoff(*, db: AsyncSession, user: User, timeoff_info: TOSche
         timeoff_info.finish_time
         if timeoff_info.finish_time is not None
         else timeoff_info.starting_time
-        + timedelta(minutes=timeoff_info.duration_in_minutes)  # type:ignore
+        + timedelta(minutes=timeoff_info.duration_in_minutes)  # type: ignore
     )
     stmt = select(
         exists(WorkingDays)
@@ -531,15 +530,13 @@ async def fetch_special_schedules(
         )
 
     stmt = None
-    # include_rest_time = (
-    #     SpecialSchedules.date == info.date if info.date is not None else True
-    # )
+
     condition = (SpecialSchedules.user_id == doctor_id) & (
         SpecialSchedules.date == info.date if info.date is not None else True
     )
 
     if info.include_rest_times:
-        print("include")
+
         stmt = (
             select(SpecialSchedules)
             .where(condition)
@@ -801,18 +798,6 @@ async def delete_service(*, db: AsyncSession, user: User, service_id: UUID):
 async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
     day_of_week = info.date.weekday()
 
-    # appointments_count_stmt = select(func.count()).where(
-    #     Appointments.service_id == info.service_id,
-    #     Appointments.date == info.date,
-    #     Appointments.status == AppointmentStatus.scheduled.value,
-    # )
-    # in_process_count_stmt = select(func.count()).where(
-    #     AppointmentPaymentSession.service_id == info.service_id,
-    #     AppointmentPaymentSession.created_at <= now(),
-    #     AppointmentPaymentSession.expires_at >= now(),
-    #     AppointmentPaymentSession.is_expired == False,
-    # )
-
     stmt = (
         select(Users.id, Users.is_active)
         .join(DoctorServices.user)
@@ -887,14 +872,14 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, "doctor is on vacation that day."
             )
-        if special_schedule.max_appointments <= appointments_count:  # type:ignore
+        if special_schedule.max_appointments <= appointments_count:  # type: ignore
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 "doctor has reached the maximum number of appointments per day.",
             )
         if (
             special_schedule.max_appointments
-            <= appointments_count + in_process_count  # type:ignore
+            <= appointments_count + in_process_count  # type: ignore
         ):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -915,14 +900,14 @@ async def check_if_doctor_is_free(*, db: AsyncSession, info: IsDoctorFree):
                 "the doctor doesn't work on that day.",
             )
 
-        if working_day_info.max_appointments <= appointments_count:  # type:ignore
+        if working_day_info.max_appointments <= appointments_count:  # type: ignore
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 "the doctor has reached the maximum number of appointments on that day for this service.",
             )
         if (
             working_day_info.max_appointments
-            <= appointments_count + in_process_count  # type:ignore
+            <= appointments_count + in_process_count  # type: ignore
         ):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,

@@ -42,8 +42,8 @@ app.add_middleware(
     https_only=False,
 )
 
-# if production:
-#     app.add_middleware(HTTPSRedirectMiddleware)
+if production:
+    app.add_middleware(HTTPSRedirectMiddleware)
 
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)

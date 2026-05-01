@@ -6,7 +6,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db import BASE
 from src.utils.time import now
 
-
 if TYPE_CHECKING:
     from src.models.doctor_authentication import DoctorRequest, Media
 
@@ -145,7 +144,7 @@ class ProfileMedia(BASE):
     __tablename__ = "profile_media"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="cascade"))
 
     document_id: Mapped[UUID] = mapped_column(
         ForeignKey("media.id", ondelete="cascade")
