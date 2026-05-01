@@ -3,6 +3,7 @@ import json
 from typing import Any, List
 
 from src.config.env import env
+from src.models.users import Users
 from src.schemas.doctor_schedule import WorkingDays as WKSchema
 from src.schemas.doctor_schedule import RestTimes as RTSchema
 from src.schemas.doctor_schedule import SpecialSchedules as SSSchema
@@ -180,3 +181,16 @@ async def get_user_from_cache(redis: Redis, key: str):
 
 async def remove_user_from_cache(redis: Redis, key: str):
     await redis.delete(key)
+
+
+def user_dict_to_object(user_cache: dict):
+
+    if isinstance(user_cache.get("id"), str):
+
+        user_cache["id"] = UUID(user_cache["id"])
+    if isinstance(user_cache.get("picture_id"), str):
+
+        user_cache["picture_id"] = UUID(user_cache["picture_id"])
+
+    user = Users(**user_cache)
+    return user

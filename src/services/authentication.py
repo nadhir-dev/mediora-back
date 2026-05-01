@@ -1,5 +1,6 @@
 from typing import Annotated, TYPE_CHECKING, Any
 from datetime import datetime, UTC
+from uuid import UUID
 from fastapi import Request
 from jose import jwt, JWTError, ExpiredSignatureError
 from argon2 import PasswordHasher
@@ -26,6 +27,7 @@ from src.utils.helpers import (
     remove_user_from_cache,
     save_user_in_cache,
     serialize_sqlalchemy,
+    user_dict_to_object,
 )
 from src.utils.time import now, after
 
@@ -456,8 +458,8 @@ async def protect(db: Annotated[AsyncSession, Depends(get_db)], request: Request
 
         lpr = datetime.fromisoformat(cache["last_password_reset"])
         del cache["last_password_reset"]
-
-        user = Users(**cache)
+        print("cache hit")
+        user = user_dict_to_object(cache)
     else:
 
         stmt = (
@@ -619,7 +621,7 @@ async def change_password(
     auth = (await db.scalars(stmt)).one()
 
     try:
-        ag2.verify(auth.password, current_password)  # type:ignore
+        ag2.verify(auth.password, current_password)  # type: ignore
     except (VerifyMismatchError, VerificationError, InvalidHashError):
 
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials.")
