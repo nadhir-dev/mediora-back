@@ -458,7 +458,7 @@ async def protect(db: Annotated[AsyncSession, Depends(get_db)], request: Request
 
         lpr = datetime.fromisoformat(cache["last_password_reset"])
         del cache["last_password_reset"]
-        print("cache hit")
+
         user = user_dict_to_object(cache)
     else:
 

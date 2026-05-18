@@ -157,7 +157,7 @@ async def fetch_doctors_requests(
                 Users.email,
                 Users.picture,
                 Users.specialty,
-            )
+            ),
         )
     )
     requests = (await db.scalars(stmt)).all()

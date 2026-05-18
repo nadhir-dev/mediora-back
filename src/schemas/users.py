@@ -16,7 +16,6 @@ from pydantic import (
 )
 from starlette import status
 
-
 # from src.schemas.doctor_requests import ImageFile
 
 
@@ -107,25 +106,43 @@ class Roles(str, Enum):
 
 
 class Speciality(str, Enum):
-    general_practice = "general practice"
-    family_medicine = "family medicine"
-    internal_medicine = "internal medicine"
-    pediatrics = "pediatrics"
-    emergency_medicine = "emergency medicine"
-
+    generaliste = "generaliste"
+    gynecology = "gynecology"
     cardiology = "cardiology"
-    dermatology = "dermatology"
-    neurology = "neurology"
-    psychiatry = "psychiatry"
-
     general_surgery = "general surgery"
-    orthopedic_surgery = "orthopedic surgery"
-    obstetrics_gynecology = "obstetrics and gynecology"
-
+    dentistry = "dentistry"
+    urology = "urology"
+    neurology = "neurology"
+    nephrology = "nephrology"
+    orl = "orl"
     ophthalmology = "ophthalmology"
-    ent = "otolaryngology (ent)"
+    endocrinology = "endocrinology"
+    dermatology = "dermatology"
+    pediatric = "pediatric"
+    traumatology = "traumatology"
+    gastroenterology = "gastroenterology"
 
-    radiology = "radiology"
+
+# class Speciality(str, Enum):
+#     general_practice = "general practice"
+#     family_medicine = "family medicine"
+#     internal_medicine = "internal medicine"
+#     pediatrics = "pediatrics"
+#     emergency_medicine = "emergency medicine"
+
+#     cardiology = "cardiology"
+#     dermatology = "dermatology"
+#     neurology = "neurology"
+#     psychiatry = "psychiatry"
+
+#     general_surgery = "general surgery"
+#     orthopedic_surgery = "orthopedic surgery"
+#     obstetrics_gynecology = "obstetrics and gynecology"
+
+#     ophthalmology = "ophthalmology"
+#     ent = "otolaryngology (ent)"
+
+#     radiology = "radiology"
 
 
 class BaseUser(BaseModel):

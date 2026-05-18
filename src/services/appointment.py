@@ -59,9 +59,7 @@ async def create_appointment_session(
     )
 
     service = await db.get(DoctorServices, appointment_info.service_id)
-    print(service.doctor_id, user.id)  # type: ignore
-    print(service.doctor_id == user.id)  # type: ignore
-    print(type(service.doctor_id), type(user.id))  # type: ignore
+
     if service.doctor_id == user.id:  # type: ignore
 
         raise HTTPException(
