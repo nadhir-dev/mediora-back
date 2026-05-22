@@ -3,6 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Response, Request, HTTPException, status
 from fastapi.params import Depends, Body, Query
 from fastapi.security import OAuth2PasswordRequestForm
+from google.oauth2 import id_token
+from google.auth.transport import requests
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.background import BackgroundTasks
 
@@ -235,7 +237,7 @@ async def auth_google(
         )
 
     refresh_token, access_token, device_id = await signin_with_google(
-        db=session, token=token, device_id=device_id
+        db=session, token=token,id_info=None , device_id=device_id
     )
 
     res.set_cookie(
@@ -270,6 +272,70 @@ async def auth_google(
 
     return {"token": access_token, "type": "Bearer"}
 
+
+#this endpoint for singin with google with phones:
+@auth_router.post("/google/auth",response_model=AccessToken)
+async def auth_gooogle_phone (
+        session: Annotated[AsyncSession, Depends(get_db)],
+        id_token : str, 
+        request:Request,
+        res:Response):
+    device_id = get_device_id(request)
+    try:
+        # Verify the token against Google's public keys
+        # The library handles fetching Google's certs, caching them, and checking expiration dates
+        id_info = id_token.verify_oauth2_token(
+            id_token, 
+            requests.Request(), 
+            GOOGLE_WEB_CLIENT_ID
+        )
+    except ValueError:
+        # Invalid token signature, expired, or malformed
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google ID Token",
+        )
+    if id_info["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
+        raise HTTPException(status_code=400, detail="Wrong issuer.")
+        
+    refresh_token, access_token, device_id = await signin_with_google(
+        db=session, token=None,id_info=id_info, device_id=device_id
+    )
+
+    res.set_cookie(
+        "access_token",
+        access_token,
+        secure=production,
+        max_age=env.access_token_expiration,
+        samesite="none" if production else "lax",
+        httponly=True,
+    )
+    res.set_cookie(
+        "refresh_token",
+        refresh_token,
+        secure=production,
+        max_age=env.refresh_token_expiration,
+        samesite="none" if production else "lax",
+        httponly=True,
+    )
+    res.set_cookie(
+        "device_id",
+        device_id,
+        secure=production,
+        max_age=env.forever,
+        samesite="none" if production else "lax",
+        httponly=True,
+    )
+    res.headers["X-Device-Id"] = str(device_id)
+
+    res.headers["access_token"] = access_token
+    res.headers["refresh_token"] = refresh_token
+    res.status_code = status.HTTP_201_CREATED
+
+    return {"token": access_token, "type": "Bearer"}
+    
+
+    
 
 @auth_router.post("/forgot-password", response_model=SuccessMessage)
 @limiter.limit("2/minute")
