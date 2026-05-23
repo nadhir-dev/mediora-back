@@ -287,7 +287,7 @@ async def auth_gooogle_phone (
         id_info = id_token.verify_oauth2_token(
             id_token, 
             requests.Request(), 
-            GOOGLE_WEB_CLIENT_ID
+            env.google_client_id
         )
     except ValueError:
         # Invalid token signature, expired, or malformed
@@ -296,7 +296,7 @@ async def auth_gooogle_phone (
             detail="Invalid Google ID Token",
         )
     if id_info["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
-        raise HTTPException(status_code=400, detail="Wrong issuer.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wrong issuer.")
         
     refresh_token, access_token, device_id = await signin_with_google(
         db=session, token=None,id_info=id_info, device_id=device_id
