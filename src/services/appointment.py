@@ -8,8 +8,8 @@ from uuid import UUID
 from fastapi import HTTPException, Request
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import or_, select, update
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import or_, select, update, exists, and_
+from sqlalchemy.orm import joinedload, selectinload, aliased
 from starlette import status
 
 from src.config.env import env
@@ -153,6 +153,20 @@ async def handle_chargilypay_webhook(
                 DoctorServices.id == session.service_id
             )
         )
+        cm1 = aliased(ConversationMembers)
+        cm2 = aliased(ConversationMembers)
+
+        conversation_exists = await db.scalar(
+            select(
+                exists().where(
+                    and_(
+                        cm1.conversation_id == cm2.conversation_id,
+                        cm1.user_id == session.patient_id,
+                        cm2.user_id == doctor_id,
+                    )
+                )
+            )
+        )
 
         if session.is_expired:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "already processed.")
@@ -179,25 +193,29 @@ async def handle_chargilypay_webhook(
         )
 
         session.is_expired = True
-        conversation = Conversations(id=gen_id(), name="for later", is_group=False)
+        rows_to_insert = [
+            appointment,
+            payment,
+            appointment_payment,
+        ]
+        if not conversation_exists:
 
-        user_membership = ConversationMembers(
-            user_id=session.patient_id, conversation_id=conversation.id
-        )
-        doctor_membership = ConversationMembers(
-            user_id=doctor_id, conversation_id=conversation.id
-        )
+            conversation = Conversations(id=gen_id(), name="for later", is_group=False)
 
-        db.add_all(
-            [
-                appointment,
-                payment,
-                appointment_payment,
+            user_membership = ConversationMembers(
+                user_id=session.patient_id, conversation_id=conversation.id
+            )
+            doctor_membership = ConversationMembers(
+                user_id=doctor_id, conversation_id=conversation.id
+            )
+
+            rows_to_insert += [
                 conversation,
                 user_membership,
                 doctor_membership,
             ]
-        )
+
+        db.add_all(rows_to_insert)
         await db.commit()
 
     elif event_type == "checkout.failed":
