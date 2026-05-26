@@ -1,4 +1,3 @@
-from curses import reset_prog_mode
 from typing import Annotated
 from fastapi import APIRouter, Response, Request, HTTPException, status
 from fastapi.params import Depends, Body, Query
@@ -7,6 +6,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.background import BackgroundTasks
+from fastapi.responses import RedirectResponse
 
 from src.config.env import env, production
 from src.config.http import limiter
@@ -21,7 +21,6 @@ from src.schemas.users import (
     UserInsertion,
     Email,
     Password,
-    SigninCredentials,
     Username,
 )
 from src.services.authentication import (
@@ -112,7 +111,7 @@ async def register(
     refresh_token, access_token, device_id = await signup(
         db=session,
         user_data=user_in,
-        device_id=device_id,  # type:ignore
+        device_id=device_id,  # type: ignore
         creation_token=creation_token,
     )
 
@@ -230,14 +229,14 @@ async def auth_google(
 ):
     device_id = get_device_id(request)
     try:
-        token = await oauth.google.authorize_access_token(request)  # type:ignore
+        token = await oauth.google.authorize_access_token(request)  # type: ignore
     except Exception:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS, "session has ended try again."
         )
 
     refresh_token, access_token, device_id = await signin_with_google(
-        db=session, token=token,id_info=None , device_id=device_id
+        db=session, token=token, id_info=None, device_id=device_id
     )
 
     res.set_cookie(
@@ -270,23 +269,23 @@ async def auth_google(
     res.headers["refresh_token"] = refresh_token
     res.status_code = status.HTTP_201_CREATED
 
-    return {"token": access_token, "type": "Bearer"}
+    redirect = RedirectResponse(url="http://localhost:5173/mainpage")
+    return redirect
 
 
-#this endpoint for singin with google with phones:
-@auth_router.post("/google/mobile",response_model=AccessToken)
-async def auth_gooogle_phone (
-        session: Annotated[AsyncSession, Depends(get_db)],
-        id_token : str, 
-        request:Request,
-        res:Response):
+# this endpoint for singin with google with phones:
+@auth_router.post("/google/mobile", response_model=AccessToken)
+async def auth_gooogle_phone(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    candidate_id_token: str,
+    request: Request,
+    res: Response,
+):
     device_id = get_device_id(request)
     try:
         # Verify the token against Google's public keys
         id_info = id_token.verify_oauth2_token(
-            id_token, 
-            requests.Request(), 
-            env.google_client_id
+            candidate_id_token, requests.Request(), env.google_client_id
         )
     except ValueError:
         # Invalid token signature, expired, or malformed
@@ -295,10 +294,12 @@ async def auth_gooogle_phone (
             detail="Invalid Google ID Token",
         )
     if id_info["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wrong issuer.")
-        
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Wrong issuer."
+        )
+
     refresh_token, access_token, device_id = await signin_with_google(
-        db=session, token=None,id_info=id_info, device_id=device_id
+        db=session, token=None, id_info=id_info, device_id=device_id
     )
 
     res.set_cookie(
@@ -332,9 +333,7 @@ async def auth_gooogle_phone (
     res.status_code = status.HTTP_201_CREATED
 
     return {"token": access_token, "type": "Bearer"}
-    
 
-    
 
 @auth_router.post("/forgot-password", response_model=SuccessMessage)
 @limiter.limit("2/minute")
@@ -407,7 +406,7 @@ async def refresh(
     old_refresh_token = get_token(request=request, token_type="refresh", required=True)
 
     refresh_token, access_token = await rotate_refresh_token(
-        db=session, refresh_token=old_refresh_token, device_id=device_id  # type:ignore
+        db=session, refresh_token=old_refresh_token, device_id=device_id  # type: ignore
     )
     response.set_cookie(
         "access_token",
