@@ -274,7 +274,7 @@ async def auth_google(
 
 
 #this endpoint for singin with google with phones:
-@auth_router.post("/google/auth",response_model=AccessToken)
+@auth_router.post("/google/mobile",response_model=AccessToken)
 async def auth_gooogle_phone (
         session: Annotated[AsyncSession, Depends(get_db)],
         id_token : str, 
@@ -283,7 +283,6 @@ async def auth_gooogle_phone (
     device_id = get_device_id(request)
     try:
         # Verify the token against Google's public keys
-        # The library handles fetching Google's certs, caching them, and checking expiration dates
         id_info = id_token.verify_oauth2_token(
             id_token, 
             requests.Request(), 
