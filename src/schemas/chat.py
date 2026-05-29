@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 class ChatResponses(str, Enum):
     message_sent = "message.sent"
     message_seen = "message.seen"
-    # typing = "message.typing"
+    typing = "message.typing"
     connected = "ping"
     error = "error"
 

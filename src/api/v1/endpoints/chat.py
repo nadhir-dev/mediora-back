@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends, Query, WebSocket
 from pydantic import ValidationError
 from starlette import status
 from json import loads
+from starlette.websockets import WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.connection import get_db
 from src.schemas.chat import (
@@ -27,7 +28,6 @@ from src.services.messaging import (
 )
 from src.utils.chat_manager import ChatManager
 from src.utils.messaging import get_user_id
-
 
 chat_router = APIRouter(prefix="/chat")
 
@@ -80,22 +80,31 @@ async def f(ws: WebSocket):
     if token is None:
         await ws.close(status.WS_1008_POLICY_VIOLATION)
         return
-
     if (user_id := get_user_id(token)) is None:
-        await ws.send_json({"message": "error"})
+        await ws.send_json(
+            {
+                "type": "error",
+                "payload": {
+                    "reason": "authentication",
+                    "structure": "text",
+                    "value": "invalid token.",
+                },
+            }
+        )
+        await ws.close(status.WS_1008_POLICY_VIOLATION)
         return
 
     await manager.connect(ws, user_id)
 
     while True:
         try:
-            recieved = await ws.receive_json()
+            received = await ws.receive_json()
 
-            match recieved.get("type", None):
+            match received.get("type", None):
 
                 case ChatActions.send.value:
 
-                    sendMessageInput = SendMessageSchema.model_validate(recieved)
+                    sendMessageInput = SendMessageSchema.model_validate(received)
                     message, members = await create_message(
                         user_id=user_id,
                         conversation_id=sendMessageInput.payload.conversation_id,
@@ -114,7 +123,7 @@ async def f(ws: WebSocket):
 
                 case ChatActions.read.value:
 
-                    readMessageInput = ReadMessageSchema.model_validate(recieved)
+                    readMessageInput = ReadMessageSchema.model_validate(received)
 
                     participants_ids, info = await read_message(
                         user_id=user_id,
@@ -132,7 +141,7 @@ async def f(ws: WebSocket):
 
                 case ChatActions.typing.value:
 
-                    typingMessageInput = TypingMessageSchema.model_validate(recieved)
+                    typingMessageInput = TypingMessageSchema.model_validate(received)
 
                     participants_ids = await get_other_participant_ids(
                         user_id, typingMessageInput.payload.conversation_id
@@ -155,6 +164,10 @@ async def f(ws: WebSocket):
                     raise ValueError(
                         "unknown type, should be message.send, message.read, message.typing, ping).",
                     )
+
+        except WebSocketDisconnect:
+            await manager.disconnect(ws, user_id)
+            return
 
         except ValidationError as e:
             await ws.send_json(

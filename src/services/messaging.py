@@ -167,6 +167,7 @@ async def get_recent_contacts(*, db: AsyncSession, user: User, limit: int, page:
     )
 
     data = (await db.execute(stmt)).all()
+
     output = []
 
     for v in data:
@@ -244,7 +245,6 @@ async def get_recent_messages(
 async def update_chat(
     *, db: AsyncSession, user: User, conversation_id: UUID, updates: ChatUpdates
 ):
-
     subquery = select(
         exists().where(
             ConversationMembers.conversation_id == conversation_id,
@@ -252,15 +252,20 @@ async def update_chat(
         )
     ).scalar_subquery()
 
-    stmt = select(Conversations, subquery.label("user_is_member")).where(
-        ConversationMembers.conversation_id == conversation_id,
+    stmt = (
+        select(Conversations, subquery.label("user_is_member"))
+        .join(
+            ConversationMembers,
+            ConversationMembers.conversation_id == Conversations.id,  # ✅ proper JOIN
+        )
+        .where(Conversations.id == conversation_id)  # ✅ filter on Conversations
     )
 
     data = (await db.execute(stmt)).one_or_none()
 
     if data is None:
         raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "there is no conversations matching this id."
+            status.HTTP_403_FORBIDDEN, "there is no conversation matching this id."
         )
 
     conversation, user_is_member = data
@@ -269,10 +274,10 @@ async def update_chat(
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "you're not a member of this chat."
         )
+
     conversation.name = updates.name
     await db.commit()
     return conversation
-
     # stmt = select(
     #     exists().where(
     #         ConversationMembers.conversation_id == conversation_id,
