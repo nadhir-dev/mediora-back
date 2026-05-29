@@ -3,13 +3,13 @@ import json
 
 from fastapi import HTTPException, Request
 from jose import ExpiredSignatureError, JWTError, jwt
-from sqlalchemy import update, select
+from sqlalchemy import func, update, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from starlette import status
 
 from src.config.env import env
-from src.models.doctor_authentication import Media
+from src.models.doctor_authentication import DoctorRequest, Media, RequestMedia
 from src.models.users import Info, ProfileMedia, Users, Auth
 from src.schemas.doctor_requests import ImageFile
 from src.schemas.users import UpdateUser, UserFlatResponse
@@ -17,11 +17,7 @@ from src.schemas.users import UpdateUser, UserFlatResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.utils.authentication import gen_id, get_token
-from src.utils.helpers import (
-    get_user_from_cache,
-    remove_user_from_cache,
-    serialize_sqlalchemy,
-)
+from src.utils.helpers import remove_user_from_cache
 
 
 async def update_user_data(*, db: AsyncSession, user: Users, updates: UpdateUser):
@@ -137,8 +133,25 @@ async def get_user_data(*, db: AsyncSession, request: Request):
             detail="invalid credentials.",
         )
 
-    redis_key = f"user:{user_id}"
-    await remove_user_from_cache(request.app.state.redis, redis_key)
+    images = []
+    if user.is_doctor:
+        subquery = (
+            select(DoctorRequest.id)
+            .where(DoctorRequest.user_id == user_id)
+            .limit(1)
+            .order_by(DoctorRequest.created_at)
+            .scalar_subquery()
+        )
+        images_stmt = (
+            select(Media.url)
+            .join(RequestMedia, RequestMedia.document_id == Media.id)
+            .join(DoctorRequest, DoctorRequest.id == RequestMedia.request_id)
+            .where(DoctorRequest.id == subquery)
+        )
+        images = [*(await db.scalars(images_stmt)).all()]
+
+    # redis_key = f"user:{user_id}"
+    # await remove_user_from_cache(request.app.state.redis, redis_key)
 
     response = UserFlatResponse(
         id=user.id,
@@ -161,5 +174,6 @@ async def get_user_data(*, db: AsyncSession, request: Request):
         practice_start_date=user.info.practice_start_date,
         description=user.info.description,
         institution=user.info.institution,
+        images_of_workplace=images,
     )
     return response

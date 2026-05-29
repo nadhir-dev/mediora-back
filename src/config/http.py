@@ -6,7 +6,6 @@ from slowapi.errors import RateLimitExceeded
 from starlette import status
 from starlette.middleware.base import BaseHTTPMiddleware
 
-
 limiter = Limiter(key_func=get_remote_address)
 
 allowed_origins = [

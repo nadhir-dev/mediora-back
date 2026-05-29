@@ -32,9 +32,9 @@ async def saveRequest(*, db: AsyncSession, user: User, docs: RequestDocuments):
             DoctorRequest.user_id == user_id, DoctorRequest.reviewed == False
         )
     )
-    any_unreviewied_requests = await db.scalar(exists_stmt)
+    any_unreviewed_requests = await db.scalar(exists_stmt)
 
-    if any_unreviewied_requests:
+    if any_unreviewed_requests:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "you're precedent request hasn't been reviewed yet.",
