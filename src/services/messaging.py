@@ -153,7 +153,7 @@ async def get_recent_contacts(*, db: AsyncSession, user: User, limit: int, page:
             & (Messages.created_at == subquery.c.latest),
         )
         .where(
-            (ConversationMembers.user_id == user.id)
+            (ConversationMembers.user_id != user.id)
             & (
                 Conversations.id.in_(
                     select(ConversationMembers.conversation_id).where(
