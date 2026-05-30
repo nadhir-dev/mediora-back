@@ -1,7 +1,7 @@
 from typing import Sequence
 from uuid import UUID
 from fastapi import HTTPException
-from sqlalchemy import exists, func, select
+from sqlalchemy import desc, exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
@@ -235,6 +235,7 @@ async def get_recent_messages(
         )
         .limit(limit)
         .offset((page - 1) * limit)
+        .order_by(desc(Messages.created_at))
     )
 
     data = (await db.scalars(stmt)).all()
@@ -245,59 +246,39 @@ async def get_recent_messages(
 async def update_chat(
     *, db: AsyncSession, user: User, conversation_id: UUID, updates: ChatUpdates
 ):
-    subquery = select(
-        exists().where(
-            ConversationMembers.conversation_id == conversation_id,
-            ConversationMembers.user_id == user.id,
+    user_is_member = await db.scalar(
+        select(
+            exists().where(
+                ConversationMembers.conversation_id == conversation_id,
+                ConversationMembers.user_id == user.id,
+            )
         )
-    ).scalar_subquery()
+    )
+    if not user_is_member:
+        if not user_is_member:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "you're not a member of this chat."
+            )
 
     stmt = (
-        select(Conversations, subquery.label("user_is_member"))
+        select(Conversations)
         .join(
-            ConversationMembers,
-            ConversationMembers.conversation_id == Conversations.id,  # ✅ proper JOIN
+            Conversations.members,
         )
-        .where(Conversations.id == conversation_id)  # ✅ filter on Conversations
+        .where(
+            Conversations.id == conversation_id, ConversationMembers.user_id == user.id
+        )
     )
 
-    data = (await db.execute(stmt)).one_or_none()
+    data = (await db.scalars(stmt)).one_or_none()
 
     if data is None:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "there is no conversation matching this id."
         )
 
-    conversation, user_is_member = data
-
-    if not user_is_member:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "you're not a member of this chat."
-        )
+    conversation = data
 
     conversation.name = updates.name
     await db.commit()
     return conversation
-    # stmt = select(
-    #     exists().where(
-    #         ConversationMembers.conversation_id == conversation_id,
-    #         ConversationMembers.user_id == user.id,
-    #     )
-    # )
-
-    # user_is_member = await db.scalar(stmt)
-
-    # if not user_is_member:
-    #     raise HTTPException(
-    #         status.HTTP_403_FORBIDDEN, "you're not a member of this chat or it doesn't include you."
-    #     )
-    # updates_dict = updates.model_dump()
-    # stmt = (
-    #     update(Conversations)
-    #     .values(**updates_dict)
-    #     .where(Conversations.id == conversation_id)
-    #     .returning(Conversations)
-    # )
-
-    # conversation =(await db.scalars(stmt)).one()
-    # return conversation

@@ -190,10 +190,14 @@ async def logout_user(*, db: AsyncSession, refresh_token: str, device_id: str):
     await db.commit()
 
 
-async def signin_with_google(*, db: AsyncSession, token,id_info, device_id: str | None):
+async def signin_with_google(
+    *, db: AsyncSession, token, id_info, device_id: str | None
+):
 
-    if id_info is None : user_info = token.get("userinfo", dict()) #case of signin from PC
-    if token is None : user_info = id_info #case of signin from phone
+    if id_info is None:
+        user_info = token.get("userinfo", dict())  # case of signin from PC
+    if token is None:
+        user_info = id_info  # case of signin from phone
     user_data = parse_google_provided_data(user_info)
     email = user_data.email
 
@@ -455,6 +459,7 @@ async def protect(db: Annotated[AsyncSession, Depends(get_db)], request: Request
     redis_key = f"user:{user_id}"
 
     cache = await get_user_from_cache(request.app.state.redis, redis_key)
+    cache = False
     if cache:
 
         lpr = datetime.fromisoformat(cache["last_password_reset"])
