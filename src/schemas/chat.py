@@ -49,8 +49,3 @@ class TypingMessageSchema(MessageSchema):
 
 class ChatUpdates(BaseModel):
     name: str
-
-
-# SendMessage.model_validate(
-
-# )

@@ -269,7 +269,7 @@ async def auth_google(
     res.headers["refresh_token"] = refresh_token
     res.status_code = status.HTTP_201_CREATED
 
-    redirect = RedirectResponse(url="http://localhost:5173/mainpage")
+    redirect = RedirectResponse(url="http://localhost:5173/request-checker")
     return redirect
 
 

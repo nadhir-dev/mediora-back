@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID, uuid4
 
 
@@ -33,7 +33,7 @@ class Conversations(BASE):
     is_group: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(default=now, type_=TIMESTAMP(True))
 
-    members: Mapped["ConversationMembers"] = relationship(
+    members: Mapped[List["ConversationMembers"]] = relationship(
         "ConversationMembers",
         uselist=True,
         foreign_keys="[ConversationMembers.conversation_id]",
